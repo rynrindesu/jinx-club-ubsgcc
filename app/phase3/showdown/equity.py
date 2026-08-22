@@ -11,6 +11,7 @@ the number of opponents instead of enumerating 13**N joint hands.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Hashable, Iterable, Mapping, Sequence
 
 from .rules import (
@@ -24,6 +25,42 @@ from .rules import (
 
 
 RangeInput = Mapping[int | str, float] | Sequence[float]
+
+
+@dataclass(frozen=True, slots=True)
+class ShowdownMetrics:
+    """Exact mutually exclusive outcomes for one showdown opponent subset.
+
+    ``split_probabilities[k]`` is the probability that the hero reaches
+    showdown without losing and ties exactly ``k`` opponents.  Consequently,
+    element zero is the sole-win probability and elements one onward describe
+    the possible pot splits.  Keeping the full distribution lets callers model
+    terminal stacks without treating fractional equity as a binary win chance.
+    """
+
+    expected_share: float
+    sole_win_probability: float
+    tie_probability: float
+    loss_probability: float
+    split_probabilities: tuple[float, ...]
+
+    @property
+    def share(self) -> float:
+        """Compact alias for callers that previously consumed only equity."""
+
+        return self.expected_share
+
+    @property
+    def win_probability(self) -> float:
+        """Alias spelling for the probability of winning without a tie."""
+
+        return self.sole_win_probability
+
+    @property
+    def tie_count_probabilities(self) -> tuple[float, ...]:
+        """Alias emphasizing that tuple indexes are numbers of tying rivals."""
+
+        return self.split_probabilities
 
 
 def normalize_range(values: RangeInput | None) -> tuple[float, ...]:
@@ -76,8 +113,14 @@ def _validated_card(value: int, label: str) -> int:
     return card
 
 
-def _share_from_outcomes(outcomes: Iterable[tuple[float, float]]) -> float:
-    """Combine per-opponent (loses_to_hero, ties_hero) probabilities."""
+def _distribution_from_outcomes(
+    outcomes: Iterable[tuple[float, float]],
+) -> tuple[float, ...]:
+    """Return probabilities for zero, one, ... tying opponents.
+
+    The distribution contains only branches where nobody beats the hero.  Its
+    missing mass is therefore the probability of a loss.
+    """
 
     # dp[k] is the probability that nobody has beaten the hero and exactly k
     # opponents tie.  Beat branches intentionally disappear from the update.
@@ -90,16 +133,51 @@ def _share_from_outcomes(outcomes: Iterable[tuple[float, float]]) -> float:
             updated[tie_count] += probability * loses
             updated[tie_count + 1] += probability * ties
         dp = updated
-    return max(
+    return tuple(dp)
+
+
+def _metrics_from_distribution(distribution: Sequence[float]) -> ShowdownMetrics:
+    """Build numerically bounded outcome metrics from one tie distribution."""
+
+    if not distribution:
+        distribution = (0.0,)
+    splits = tuple(
+        max(0.0, min(1.0, float(probability))) for probability in distribution
+    )
+    sole_win = splits[0]
+    tie = max(0.0, min(1.0 - sole_win, sum(splits[1:])))
+    no_loss = max(0.0, min(1.0, sole_win + tie))
+    expected_share = max(
         0.0,
-        min(1.0, sum(probability / (tie_count + 1) for tie_count, probability in enumerate(dp))),
+        min(
+            1.0,
+            sum(
+                probability / (tie_count + 1)
+                for tie_count, probability in enumerate(splits)
+            ),
+        ),
+    )
+    return ShowdownMetrics(
+        expected_share=expected_share,
+        sole_win_probability=sole_win,
+        tie_probability=tie,
+        loss_probability=1.0 - no_loss,
+        split_probabilities=splits,
     )
 
 
-def _shares_for_all_masks(
+def _share_from_outcomes(outcomes: Iterable[tuple[float, float]]) -> float:
+    """Combine per-opponent (loses_to_hero, ties_hero) probabilities."""
+
+    return _metrics_from_distribution(
+        _distribution_from_outcomes(outcomes)
+    ).expected_share
+
+
+def _distributions_for_all_masks(
     outcomes: Sequence[tuple[float, float]],
-) -> tuple[float, ...]:
-    """Return exact shares for every subset of an ordered outcome sequence.
+) -> tuple[tuple[float, ...], ...]:
+    """Return exact tie distributions for every opponent subset.
 
     Each mask extends the already-computed DP for ``mask`` without its least
     significant bit.  Thus every subset performs one opponent update instead
@@ -108,9 +186,7 @@ def _shares_for_all_masks(
 
     size = 1 << len(outcomes)
     distributions: list[tuple[float, ...] | None] = [None] * size
-    shares = [0.0] * size
     distributions[0] = (1.0,)
-    shares[0] = 1.0
     for mask in range(1, size):
         bit = mask & -mask
         opponent_index = bit.bit_length() - 1
@@ -125,17 +201,21 @@ def _shares_for_all_masks(
             updated[tie_count + 1] += probability * ties
         distribution = tuple(updated)
         distributions[mask] = distribution
-        shares[mask] = max(
-            0.0,
-            min(
-                1.0,
-                sum(
-                    probability / (tie_count + 1)
-                    for tie_count, probability in enumerate(distribution)
-                ),
-            ),
-        )
-    return tuple(shares)
+    return tuple(
+        distribution if distribution is not None else (0.0,)
+        for distribution in distributions
+    )
+
+
+def _shares_for_all_masks(
+    outcomes: Sequence[tuple[float, float]],
+) -> tuple[float, ...]:
+    """Return exact shares for every subset of an ordered outcome sequence."""
+
+    return tuple(
+        _metrics_from_distribution(distribution).expected_share
+        for distribution in _distributions_for_all_masks(outcomes)
+    )
 
 
 def exact_share_for_hypothesis(
@@ -254,18 +334,18 @@ def _revealed_showdown_share(
     return (1.0 - fallback_weight) * formula_share + fallback_weight * empirical_share
 
 
-def showdown_shares_by_subset(
+def showdown_metrics_by_subset(
     hero_number: int,
     community: int | None,
     opponent_ranges_by_key: Mapping[Hashable, RangeInput | None],
     rule_model: RuleModel,
-) -> dict[frozenset[Hashable], float]:
-    """Return equity against every subset of up to five named opponents.
+) -> dict[frozenset[Hashable], ShowdownMetrics]:
+    """Return exact outcome metrics for every subset of named opponents.
 
     Ranges, ranks, and per-opponent outcomes are computed once.  Formula shares
     and the empirical fallback then reuse one dynamic-program transition per
     subset.  The returned mapping contains all ``2**N`` subsets, including the
-    empty subset with a share of exactly ``1.0``.
+    empty subset as a certain sole win with a share of exactly ``1.0``.
     """
 
     hero_number = _validated_card(hero_number, "hero number")
@@ -303,9 +383,13 @@ def showdown_shares_by_subset(
             for weight, hypothesis in posterior_entries
         ]
 
-    totals = [0.0] * subset_count
+    # Use a fixed width while accumulating across hypotheses and communities;
+    # each result is trimmed to the number of opponents in its subset below.
+    totals = [[0.0] * (len(keys) + 1) for _mask in range(subset_count)]
     for revealed in communities:
-        formula_shares = [0.0] * subset_count
+        formula_distributions = [
+            [0.0] * (len(keys) + 1) for _mask in range(subset_count)
+        ]
         ranked_hypotheses: list[
             tuple[float, tuple[int | float, ...], tuple[tuple[int | float, ...], ...]]
         ] = []
@@ -328,9 +412,12 @@ def showdown_shares_by_subset(
                     elif hero_rank == opponent_rank:
                         ties_hero += probability
                 outcomes.append((loses_to_hero, ties_hero))
-            hypothesis_shares = _shares_for_all_masks(outcomes)
-            for mask, share in enumerate(hypothesis_shares):
-                formula_shares[mask] += posterior_weight * share
+            hypothesis_distributions = _distributions_for_all_masks(outcomes)
+            for mask, distribution in enumerate(hypothesis_distributions):
+                for tie_count, probability in enumerate(distribution):
+                    formula_distributions[mask][tie_count] += (
+                        posterior_weight * probability
+                    )
 
         fallback_weight = rule_model.fallback_weight(revealed)
         if fallback_weight > 0.0:
@@ -358,24 +445,57 @@ def showdown_shares_by_subset(
                     loses_to_hero += range_probability * win_probability
                     ties_hero += range_probability * tie_probability
                 fallback_outcomes.append((loses_to_hero, ties_hero))
-            fallback_shares = _shares_for_all_masks(fallback_outcomes)
+            fallback_distributions = _distributions_for_all_masks(fallback_outcomes)
             for mask in range(subset_count):
-                totals[mask] += (
-                    (1.0 - fallback_weight) * formula_shares[mask]
-                    + fallback_weight * fallback_shares[mask]
-                )
+                for tie_count in range(len(fallback_distributions[mask])):
+                    totals[mask][tie_count] += (
+                        (1.0 - fallback_weight)
+                        * formula_distributions[mask][tie_count]
+                        + fallback_weight
+                        * fallback_distributions[mask][tie_count]
+                    )
         else:
             for mask in range(subset_count):
-                totals[mask] += formula_shares[mask]
+                for tie_count in range(mask.bit_count() + 1):
+                    totals[mask][tie_count] += formula_distributions[mask][tie_count]
 
     divisor = float(len(communities))
-    result = {
-        subset_keys[mask]: totals[mask] / divisor for mask in range(subset_count)
-    }
+    result: dict[frozenset[Hashable], ShowdownMetrics] = {}
+    for mask in range(subset_count):
+        distribution = tuple(
+            totals[mask][tie_count] / divisor
+            for tie_count in range(mask.bit_count() + 1)
+        )
+        result[subset_keys[mask]] = _metrics_from_distribution(distribution)
     # Preserve the exact mathematical identity rather than a nearly-one float
     # accumulated through posterior/community mixtures.
-    result[frozenset()] = 1.0
+    result[frozenset()] = ShowdownMetrics(
+        expected_share=1.0,
+        sole_win_probability=1.0,
+        tie_probability=0.0,
+        loss_probability=0.0,
+        split_probabilities=(1.0,),
+    )
     return result
+
+
+def showdown_shares_by_subset(
+    hero_number: int,
+    community: int | None,
+    opponent_ranges_by_key: Mapping[Hashable, RangeInput | None],
+    rule_model: RuleModel,
+) -> dict[frozenset[Hashable], float]:
+    """Project expected shares from :func:`showdown_metrics_by_subset`."""
+
+    return {
+        opponents: metrics.expected_share
+        for opponents, metrics in showdown_metrics_by_subset(
+            hero_number,
+            community,
+            opponent_ranges_by_key,
+            rule_model,
+        ).items()
+    }
 
 
 def showdown_share(
@@ -405,8 +525,10 @@ def showdown_share(
 
 __all__ = [
     "RangeInput",
+    "ShowdownMetrics",
     "exact_share_for_hypothesis",
     "normalize_range",
     "showdown_share",
+    "showdown_metrics_by_subset",
     "showdown_shares_by_subset",
 ]

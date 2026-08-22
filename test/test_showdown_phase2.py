@@ -236,6 +236,27 @@ class RuleInferenceTests(unittest.TestCase):
         self.assertEqual(weak_only.mean, 1.0)
         self.assertEqual(strong_only.mean, 0.0)
 
+    def test_cannot_lose_ignores_range_weights_and_requires_exact_candidates(self):
+        pair_rule = next(
+            candidate
+            for candidate in build_candidate_rules()
+            if candidate.name == "pair_then_higher"
+        )
+        knowledge = RuleKnowledge((pair_rule,))
+
+        locked_pair = knowledge.estimate(5, 5)
+        weighted_but_beatable = knowledge.estimate(
+            4,
+            5,
+            opponent_range=[1] + [0] * 12,
+        )
+        fallback = RuleKnowledge(()).estimate(5, 5)
+
+        self.assertTrue(locked_pair.cannot_lose)
+        self.assertEqual(weighted_but_beatable.mean, 1.0)
+        self.assertFalse(weighted_but_beatable.cannot_lose)
+        self.assertFalse(fallback.cannot_lose)
+
     def test_pairwise_fallback_uses_transitive_results(self):
         knowledge = RuleKnowledge(())
         knowledge.ingest(
@@ -673,7 +694,7 @@ class Phase2PolicyTests(unittest.TestCase):
 
         self.assertEqual(engine.decide(request), {"action": "call"})
 
-    def test_learned_second_best_hand_cannot_call_off_entire_stack(self):
+    def test_learned_second_best_hand_takes_cheap_all_in_price(self):
         state = Phase2State()
         teach_candidate(state, "low-rule", "lower")
         engine = Phase2Engine(state)
@@ -697,7 +718,11 @@ class Phase2PolicyTests(unittest.TestCase):
         )
         request["players"][0].update(stack=20, bet_this_round=2)
 
-        self.assertEqual(engine.decide(request), {"action": "fold"})
+        self.assertEqual(engine.decide(request), {"action": "call"})
+
+        weakest = copy.deepcopy(request)
+        weakest["your_number"] = 13
+        self.assertEqual(engine.decide(weakest), {"action": "fold"})
 
     def test_desperate_learned_nuts_can_take_only_legal_all_in_raise(self):
         state = Phase2State()
@@ -981,7 +1006,7 @@ class Phase2PolicyTests(unittest.TestCase):
             engine.decide(strongest), {"action": "bet", "amount": 5}
         )
 
-    def test_large_post_reveal_raise_needs_top_tier_learned_equity(self):
+    def test_post_reveal_reraise_folds_marginal_hands_and_calls_top_tier(self):
         state = Phase2State()
         teach_candidate(state, "safe-low-rule", "lower")
         engine = Phase2Engine(state)
@@ -1035,7 +1060,7 @@ class Phase2PolicyTests(unittest.TestCase):
         self.assertEqual(engine.decide(raised_post(3, 10)), {"action": "fold"})
         self.assertEqual(
             engine.decide(raised_post(1, 10)),
-            {"action": "raise", "amount": 46},
+            {"action": "call"},
         )
 
     def test_strong_reraise_range_overrides_an_early_chip_cushion(self):

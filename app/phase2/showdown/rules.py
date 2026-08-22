@@ -58,6 +58,7 @@ class EquityEstimate:
     candidate_count: int
     observation_count: int
     confidence: str
+    cannot_lose: bool
 
 
 @dataclass
@@ -264,11 +265,22 @@ class RuleKnowledge:
             lower = min(equities)
             upper = max(equities)
             coverage = agreement
+            cannot_lose = all(
+                _candidate_cannot_lose(
+                    self.candidates[index],
+                    your_number,
+                    community,
+                )
+                for index in self.active_candidates
+            )
         else:
             mean, lower, upper, coverage = self._fallback_equity(
                 your_number, community, normalized_range
             )
             equities = [mean]
+            # Pairwise fallback evidence only describes observed comparisons;
+            # it cannot prove safety against every still-possible number.
+            cannot_lose = False
 
         trusted_observations = (
             [
@@ -309,6 +321,7 @@ class RuleKnowledge:
             candidate_count=len(self.active_candidates),
             observation_count=trusted_count,
             confidence=confidence,
+            cannot_lose=cannot_lose,
         )
 
     def _candidate_agreement(self) -> float:
@@ -636,6 +649,21 @@ def _candidate_equity(
         for opponent in range(1, 14)
     ]
     return sum(shares) / len(communities)
+
+
+def _candidate_cannot_lose(
+    candidate: RuleCandidate,
+    your_number: int,
+    community: int | None,
+) -> bool:
+    """Prove that a candidate never ranks this hand below any legal number."""
+
+    communities = range(1, 14) if community is None else (community,)
+    return all(
+        candidate.compare(your_number, opponent, shared) >= 0
+        for shared in communities
+        for opponent in range(1, 14)
+    )
 
 
 def _normalized_opponent_range(

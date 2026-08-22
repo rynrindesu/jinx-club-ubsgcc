@@ -227,20 +227,18 @@ def _pre_reveal_move(
             ),
         )
     if not _call_exposure_allowed(
-        payload=payload,
         to_call=to_call,
         stack=stack,
         conservative=conservative,
         estimate=estimate,
         risk=risk,
+        required_equity=required,
     ):
         return _fallback(payload, "fold")
-    if conservative >= required and to_call <= stack:
-        # The observed opponent four-bet every exploratory three-bet, turning
-        # raise-to-8/fold lines into the largest repeated pre-reveal leak.
-        # Realize learned equity by calling; value raises happen after reveal.
-        return _fallback(payload, "call")
-    return _fallback(payload, "fold")
+    # The observed opponent four-bet every exploratory three-bet, turning
+    # raise-to-8/fold lines into the largest repeated pre-reveal leak.  Realize
+    # learned equity by calling; value raises happen after reveal.
+    return _fallback(payload, "call")
 
 
 def _post_reveal_move(
@@ -315,32 +313,34 @@ def _post_reveal_move(
             )
 
         if not _call_exposure_allowed(
-            payload=payload,
             to_call=to_call,
             stack=stack,
             conservative=conservative,
             estimate=estimate,
             risk=risk,
+            required_equity=required,
         ):
             return _fallback(payload, "fold")
 
-        if conservative >= required:
-            if (
-                "raise" in _legal_actions(payload)
-                and conservative >= 0.89
-                and estimate.confidence == "learned"
-                and conservative >= risk.continuation_floor
-            ):
-                return _pot_wager(
-                    payload,
-                    "raise",
-                    0.55,
-                    allow_all_in=risk.chasing and conservative >= 0.94,
-                    fallback="call",
-                )
-            return _fallback(payload, "call")
-
-        return _fallback(payload, "fold")
+        # Make at most one voluntary value wager per post-reveal round.  Once
+        # the opponent reopens the action, realize our equity instead of
+        # escalating into a raise war and later folding the closing price.
+        if (
+            conservative >= required
+            and not _we_wagered_this_round(payload)
+            and "raise" in _legal_actions(payload)
+            and conservative >= 0.89
+            and estimate.confidence == "learned"
+            and conservative >= risk.continuation_floor
+        ):
+            return _pot_wager(
+                payload,
+                "raise",
+                0.55,
+                allow_all_in=risk.chasing and conservative >= 0.94,
+                fallback="call",
+            )
+        return _fallback(payload, "call")
 
     wager_action = _wager_action(payload)
     if wager_action is None:
@@ -574,7 +574,15 @@ def _planned_two_street_requirement(
     if raise_total is None or raise_total < 2 * big_blind + 1:
         return 0.0
 
-    planned_post_call = raise_total + big_blind
+    remaining_after_call = max(0, stack - to_call)
+    if remaining_after_call == 0:
+        # An all-in call closes our betting.  The caller's ordinary pot-odds
+        # requirement already prices it; there is no second street to reserve.
+        return 0.0
+    planned_post_call = min(
+        raise_total + big_blind,
+        remaining_after_call,
+    )
     planned_cost = to_call + planned_post_call
     final_pot = pot + to_call + 2 * planned_post_call
     planned_odds = planned_cost / max(1, final_pot)
@@ -586,38 +594,38 @@ def _planned_two_street_requirement(
         entry_floor += 0.04
     elif profile.passive:
         entry_floor -= 0.03
-    if planned_cost >= stack:
-        entry_floor = max(entry_floor, 0.94)
     return max(entry_floor, planned_odds + 0.10 + risk.call_caution)
 
 
 def _call_exposure_allowed(
     *,
-    payload: Mapping[str, Any],
     to_call: int,
     stack: int,
     conservative: float,
     estimate: EquityEstimate,
     risk: RiskContext,
+    required_equity: float,
 ) -> bool:
-    """Reject stack-threatening calls unless the rule proves near-nut equity."""
+    """Apply one incremental-price requirement to every learned-hand call."""
 
     if to_call <= 0:
         return True
-    proven_nuts = estimate.confidence == "learned" and conservative >= 0.94
-    if to_call >= stack:
-        return proven_nuts
-    if to_call / max(1, stack) >= 0.35 and conservative < 0.90:
+    if stack <= 0 or to_call > stack:
         return False
+    if estimate.confidence == "learned" and estimate.cannot_lose:
+        return True
+
     # A guarded lead is not yet a coast: future blinds can still consume it.
     # Permit a strong response within the chips needed to close the target gap,
     # and demand progressively more certainty only beyond that gap.
     if risk.guarded and to_call > max(2, risk.target_gap):
         excess = to_call - risk.target_gap
-        required = min(0.94, risk.continuation_floor + 0.01 * excess)
-        if conservative < required and not proven_nuts:
-            return False
-    return True
+        guarded_requirement = min(
+            0.94,
+            risk.continuation_floor + 0.01 * excess,
+        )
+        required_equity = max(required_equity, guarded_requirement)
+    return conservative >= required_equity
 
 
 def _current_hand_commitment(payload: Mapping[str, Any]) -> int:

@@ -13,7 +13,11 @@ from app.phase2.showdown.state import OpponentProfile, Phase2State
 from test.test_showdown_phase2 import phase2_request
 
 
-def learned_equity(mean: float) -> EquityEstimate:
+def learned_equity(
+    mean: float,
+    *,
+    cannot_lose: bool = False,
+) -> EquityEstimate:
     return EquityEstimate(
         mean=mean,
         lower=mean,
@@ -23,6 +27,7 @@ def learned_equity(mean: float) -> EquityEstimate:
         candidate_count=1,
         observation_count=12,
         confidence="learned",
+        cannot_lose=cannot_lose,
     )
 
 
@@ -275,6 +280,223 @@ class Phase2PolicyRegressionTests(unittest.TestCase):
                 _risk_context(request),
             ),
             {"action": "call"},
+        )
+
+    def test_post_reveal_value_raise_cannot_escalate_into_raise_war(self):
+        request = phase2_request(
+            11,
+            table_rule="replay-leg-three",
+            leg_number=3,
+            hand_number=29,
+        )
+        request.update(
+            round="post_reveal",
+            community_number=11,
+            your_stack=179,
+            pot=76,
+            to_call=34,
+            min_raise_to=84,
+            max_raise_to=195,
+            legal_actions=["fold", "call", "raise"],
+            current_hand_actions=[
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "bet",
+                    "amount": 7,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 0,
+                    "action": "raise",
+                    "amount": 16,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 50,
+                },
+            ],
+        )
+        request["players"][0].update(stack=179, bet_this_round=16)
+        request["players"][1].update(bet_this_round=50)
+
+        self.assertEqual(
+            _post_reveal_move(
+                request,
+                learned_equity(0.9030913902399875),
+                neutral_profile(),
+                _risk_context(request),
+            ),
+            {"action": "call"},
+        )
+
+    def test_replay_closing_all_ins_are_called_after_value_wager(self):
+        leg_four_hand_one = phase2_request(
+            1,
+            table_rule="replay-leg-four",
+            leg_number=4,
+            hand_number=1,
+        )
+        leg_four_hand_one.update(
+            round="post_reveal",
+            community_number=9,
+            your_stack=12,
+            pot=388,
+            to_call=12,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+            current_hand_actions=[
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "bet",
+                    "amount": 13,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 0,
+                    "action": "raise",
+                    "amount": 31,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 97,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 0,
+                    "action": "raise",
+                    "amount": 178,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 190,
+                },
+            ],
+        )
+        leg_four_hand_one["players"][0].update(
+            stack=12,
+            bet_this_round=178,
+        )
+        leg_four_hand_one["players"][1].update(bet_this_round=190)
+
+        leg_four_hand_twenty_eight = phase2_request(
+            1,
+            table_rule="replay-leg-four",
+            leg_number=4,
+            hand_number=28,
+            delta=-183,
+        )
+        leg_four_hand_twenty_eight.update(
+            round="post_reveal",
+            community_number=10,
+            button_seat=1,
+            your_stack=7,
+            pot=36,
+            to_call=7,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+            current_hand_actions=[
+                {
+                    "round": "pre_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 5,
+                },
+                {
+                    "round": "pre_reveal",
+                    "seat": 0,
+                    "action": "call",
+                    "amount": 5,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 0,
+                    "action": "bet",
+                    "amount": 5,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 21,
+                },
+            ],
+        )
+        leg_four_hand_twenty_eight["players"][0].update(
+            chip_delta=-183,
+            stack=7,
+            bet_this_round=5,
+        )
+        leg_four_hand_twenty_eight["players"][1].update(
+            chip_delta=183,
+            bet_this_round=21,
+        )
+
+        for request in (leg_four_hand_one, leg_four_hand_twenty_eight):
+            with self.subTest(hand=request["hand_number"]):
+                self.assertEqual(
+                    _post_reveal_move(
+                        request,
+                        learned_equity(
+                            0.9030913902399875,
+                            cannot_lose=True,
+                        ),
+                        neutral_profile(),
+                        _risk_context(request),
+                    ),
+                    {"action": "call"},
+                )
+
+    def test_large_call_uses_incremental_pot_price_not_stack_fraction(self):
+        request = phase2_request(7, hand_number=10)
+        request.update(
+            round="post_reveal",
+            community_number=5,
+            your_stack=100,
+            pot=200,
+            to_call=40,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+            current_hand_actions=[
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "bet",
+                    "amount": 40,
+                }
+            ],
+        )
+        request["players"][0].update(stack=100, bet_this_round=0)
+        request["players"][1].update(bet_this_round=40)
+        risk = _risk_context(request)
+
+        self.assertEqual(
+            _post_reveal_move(
+                request,
+                learned_equity(0.85),
+                neutral_profile(),
+                risk,
+            ),
+            {"action": "call"},
+        )
+        self.assertEqual(
+            _post_reveal_move(
+                request,
+                learned_equity(0.15),
+                neutral_profile(),
+                risk,
+            ),
+            {"action": "fold"},
         )
 
 

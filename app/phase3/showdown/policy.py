@@ -8,7 +8,7 @@ import math
 import time
 from typing import Any, Iterable
 
-from .equity import showdown_shares_by_subset
+from .equity import ShowdownMetrics, showdown_metrics_by_subset
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +31,10 @@ class PolicyConfig:
     endgame_hands: int = 12
     decision_budget_seconds: float = 0.45
     # Value is intentionally convex on positive outcomes: retries reward tail wins.
-    positive_tail_weight: float = 0.045
+    # Fixed-seed tuning selected zero extra quadratic curvature: the low bust
+    # penalty, leader-margin reward, large candidate sizes, and retry objective
+    # already produce a high-variance policy. Larger values reduced clear rate.
+    positive_tail_weight: float = 0.0
     leader_margin_weight: float = 1.8
     early_clear_bonus: float = 18.0
 
@@ -72,18 +75,39 @@ class HighVariancePolicy:
             )
             for player in opponents
         }
-        equity_cache = showdown_shares_by_subset(
+        metrics_cache = showdown_metrics_by_subset(
             request.your_number,
             request.community_number,
             ranges,
             rule_model,
         )
 
-        def equity_for(seats: Iterable[int]) -> float:
+        def metrics_for(seats: Iterable[int]) -> ShowdownMetrics:
             key = frozenset(seats)
-            return equity_cache.get(key, 1.0 if not key else 0.0)
+            return metrics_cache[key]
+
+        def equity_for(seats: Iterable[int]) -> float:
+            return metrics_for(seats).expected_share
 
         candidates = self._candidates(request, responders)
+        remaining_hands = max(0, request.total_hands - request.hand_number)
+
+        # In the closing hands, do not risk a qualifying unique lead when a
+        # passive legal action survives even the worst award of the current pot.
+        if remaining_hands <= self.config.endgame_hands:
+            for passive_action in ("check", "fold"):
+                if passive_action in request.legal_actions and self._passive_is_safe(
+                    request, passive_action
+                ):
+                    return {"action": passive_action}
+
+        # On the final hand a free check whose best possible showdown payout
+        # still cannot clear is dominated by any legal aggressive line with a
+        # non-zero chance of collecting calls.  Remove it rather than letting
+        # failure-gap utility disguise the exact terminal predicate.
+        if remaining_hands == 0 and not self._passive_can_clear(request):
+            if any(candidate.action in {"bet", "raise"} for candidate in candidates):
+                candidates = [candidate for candidate in candidates if candidate.action != "check"]
         if (
             request.hand_number <= self.config.scout_hands
             and rule_model.confidence() < self.config.scout_confidence
@@ -110,7 +134,7 @@ class HighVariancePolicy:
                 responders,
                 ranges,
                 range_strengths,
-                equity_for,
+                metrics_for,
                 knowledge,
             )
             # Stable tie-breaking: prefer actions that invest more in high-variance
@@ -171,7 +195,7 @@ class HighVariancePolicy:
         responders: list[Any],
         ranges: dict[int, list[float]],
         range_strengths: dict[int, float],
-        equity_for: Any,
+        metrics_for: Any,
         knowledge: Any,
     ) -> float:
         hero_extra = self._hero_extra(request, candidate)
@@ -195,7 +219,8 @@ class HighVariancePolicy:
                 opponents,
                 continuing,
                 ranges,
-                equity_for(continuing),
+                range_strengths,
+                metrics_for(continuing),
                 hero_extra,
                 {},
                 final_pot,
@@ -205,12 +230,13 @@ class HighVariancePolicy:
                 rule_model,
                 candidate,
                 len(continuing),
-                equity_for(continuing),
+                metrics_for(continuing).expected_share,
             )
 
         target = candidate.amount or request.own_player.bet_this_round
         size_ratio = hero_extra / max(1.0, request.pot + request.to_call)
         probabilities: list[tuple[Any, float, int]] = []
+        conditioned_ranges = dict(ranges)
         for player in responders:
             call_extra = min(
                 player.stack,
@@ -226,6 +252,21 @@ class HighVariancePolicy:
                 strength,
             )
             probabilities.append((player, probability, call_extra))
+            conditioned_ranges[player.seat] = self._range_conditioned_on_continue(
+                ranges[player.seat],
+                profile,
+                request,
+                player,
+                rule_model,
+                size_ratio,
+            )
+
+        continuing_metrics_cache = showdown_metrics_by_subset(
+            request.your_number,
+            request.community_number,
+            conditioned_ranges,
+            rule_model,
+        )
 
         total = 0.0
         for choices in product((False, True), repeat=len(probabilities)):
@@ -260,14 +301,17 @@ class HighVariancePolicy:
                     opponents,
                     continuing,
                     ranges,
-                    equity_for(continuing),
+                    range_strengths,
+                    continuing_metrics_cache[frozenset(continuing)],
                     hero_extra,
                     call_extras,
                     final_pot,
                 )
             total += branch_probability * branch_value
 
-        base_equity = equity_for(player.seat for player in opponents)
+        base_equity = metrics_for(
+            player.seat for player in opponents
+        ).expected_share
         total += self._scout_adjustment(
             request,
             session,
@@ -296,42 +340,45 @@ class HighVariancePolicy:
         opponents: list[Any],
         continuing: set[int],
         ranges: dict[int, list[float]],
-        equity: float,
+        range_strengths: dict[int, float],
+        metrics: ShowdownMetrics,
         hero_extra: int,
         call_extras: dict[int, int],
         final_pot: int,
     ) -> float:
-        base_other = self._base_other_deltas(request, call_extras)
-        hero_win_delta = (
-            request.your_stack - hero_extra + final_pot - request.starting_stack
-        )
-        win_value = self._outcome_utility(
-            hero_win_delta, base_other.values(), request
-        )
-
         eligible = [player for player in opponents if player.seat in continuing]
+        base_other = self._base_other_deltas(request, call_extras)
         if not eligible:
-            return win_value
-        weights = []
-        for player in eligible:
-            strength = self._range_strength(
-                ranges[player.seat], request.community_number, None
+            hero_delta = (
+                request.your_stack - hero_extra + final_pot - request.starting_stack
             )
-            # Targeting the current leader matters: if hero loses, a pot going to
-            # that seat is the worst branch for the exact clearing objective.
-            lead_weight = 1.0 + max(0.0, player.chip_delta) / 100.0
-            weights.append(max(0.01, strength * lead_weight))
-        weight_total = sum(weights)
+            return self._outcome_utility(hero_delta, base_other.values(), request)
 
-        lose_value = 0.0
-        hero_lose_delta = request.your_stack - hero_extra - request.starting_stack
-        for player, weight in zip(eligible, weights, strict=True):
+        contributions = self._branch_contributions(request, hero_extra, call_extras)
+        guaranteed, contestable = self._hero_pot_components(
+            request, continuing, contributions, final_pot
+        )
+        hero_base_delta = request.your_stack - hero_extra - request.starting_stack
+
+        def value_for_award(hero_award: float) -> float:
             outcome = dict(base_other)
-            outcome[player.seat] += final_pot
-            lose_value += (weight / weight_total) * self._outcome_utility(
-                hero_lose_delta, outcome.values(), request
+            remaining_pot = max(0.0, final_pot - hero_award)
+            self._award_to_likely_opponent(
+                request, eligible, outcome, remaining_pot
             )
-        return equity * win_value + (1.0 - equity) * lose_value
+            return self._outcome_utility(
+                hero_base_delta + hero_award, outcome.values(), request
+            )
+
+        total = 0.0
+        for tie_count, probability in enumerate(metrics.split_probabilities):
+            if probability <= 0.0:
+                continue
+            hero_award = guaranteed + contestable / (tie_count + 1)
+            total += probability * value_for_award(hero_award)
+        if metrics.loss_probability > 0.0:
+            total += metrics.loss_probability * value_for_award(guaranteed)
+        return total
 
     def _outcome_utility(
         self,
@@ -347,21 +394,29 @@ class HighVariancePolicy:
         target = max(10.0, leader + 1.0)
 
         if remaining == 0:
-            return 10_000.0 if clear else -20.0 * max(1.0, target - hero_delta)
+            # The phase awards points for the binary clear predicate, not for
+            # being a close second.  Keep failure utility bounded so even a
+            # modest simulated chance to clear beats guaranteed failure.
+            return (
+                1_000_000.0 + hero_delta
+                if clear
+                else -1_000.0 - min(500.0, max(0.0, target - hero_delta))
+            )
         if remaining <= self.config.endgame_hands:
             if clear:
-                return 2_000.0 + 30.0 * margin + 2.0 * hero_delta
+                return 100_000.0 + 30.0 * margin + 2.0 * hero_delta
             return (
-                2.0 * hero_delta
-                - 12.0 * max(0.0, target - hero_delta)
-                + 3.0 * max(0.0, margin)
+                -1_000.0
+                - min(500.0, max(0.0, target - hero_delta))
+                + 0.25 * hero_delta
             )
 
         trajectory = math.ceil(10.0 * request.hand_number / request.total_hands)
         on_trajectory = hero_delta >= trajectory and margin > 0.0
         positive = max(0.0, hero_delta)
-        # Convex positive utility is the explicit high-variance posture selected
-        # for retry-best scoring.  Negative outcomes receive only a light penalty.
+        # The retry-best posture rewards leader margin and penalizes busting only
+        # lightly.  An optional quadratic term is retained for simulator tuning;
+        # the selected default does not need extra curvature.
         return (
             hero_delta
             + self.config.positive_tail_weight * positive * positive
@@ -382,7 +437,10 @@ class HighVariancePolicy:
         confidence = float(rule_model.confidence())
         if request.hand_number > self.config.scout_hands or confidence >= self.config.scout_confidence:
             return 0.0
-        spent = self._observed_scout_calls(request)
+        spent = max(
+            self._observed_scout_calls(request),
+            int(getattr(session, "scout_spend", 0)),
+        )
         investment = self._hero_extra(request, candidate)
         free_or_call = candidate.action in {"check", "call"}
         information = (1.0 - confidence) * min(3, showdown_opponents) * 4.0
@@ -417,11 +475,122 @@ class HighVariancePolicy:
         }
 
     @staticmethod
+    def _branch_contributions(
+        request: Any, hero_extra: int, call_extras: dict[int, int]
+    ) -> dict[int, int]:
+        """Reconstruct each seat's hand contribution from round-total actions."""
+
+        streets: dict[str, dict[int, int]] = {
+            "pre_reveal": {player.seat: 0 for player in request.players},
+            "post_reveal": {player.seat: 0 for player in request.players},
+        }
+        maxima = {"pre_reveal": 0, "post_reveal": 0}
+        active = sorted(player.seat for player in request.players if not player.busted)
+        if request.button_seat in active and len(active) >= 2:
+            button_index = active.index(request.button_seat)
+            clockwise = active[button_index + 1 :] + active[: button_index + 1]
+            if len(active) == 2:
+                small_seat = request.button_seat
+                big_seat = next(seat for seat in active if seat != request.button_seat)
+            else:
+                small_seat, big_seat = clockwise[:2]
+            streets["pre_reveal"][small_seat] = request.small_blind
+            streets["pre_reveal"][big_seat] = request.big_blind
+            maxima["pre_reveal"] = request.big_blind
+
+        for action in request.current_hand_actions:
+            if action.round not in streets:
+                continue
+            round_totals = streets[action.round]
+            if action.amount is not None:
+                round_totals[action.seat] = max(
+                    round_totals.get(action.seat, 0), action.amount
+                )
+            elif action.action == "call":
+                round_totals[action.seat] = max(
+                    round_totals.get(action.seat, 0), maxima[action.round]
+                )
+            if action.action in {"bet", "raise"}:
+                maxima[action.round] = max(
+                    maxima[action.round], round_totals.get(action.seat, 0)
+                )
+
+        for player in request.players:
+            streets[request.round][player.seat] = max(
+                streets[request.round].get(player.seat, 0), player.bet_this_round
+            )
+        contributions = {
+            player.seat: sum(street.get(player.seat, 0) for street in streets.values())
+            for player in request.players
+        }
+
+        # Pot size is coordinator-authoritative.  Sparse action logs can omit a
+        # prior-round contribution; assign any unexplained chips to the deepest
+        # opponent so hero eligibility is never overstated.
+        unexplained = request.pot - sum(contributions.values())
+        if unexplained > 0:
+            recipients = [
+                player for player in request.players if player.seat != request.your_seat
+            ]
+            if recipients:
+                recipient = min(
+                    recipients,
+                    key=lambda player: (player.stack, player.seat),
+                )
+                contributions[recipient.seat] += unexplained
+            else:
+                contributions[request.your_seat] += unexplained
+
+        contributions[request.your_seat] = (
+            contributions.get(request.your_seat, 0) + hero_extra
+        )
+        for seat, extra in call_extras.items():
+            contributions[seat] = contributions.get(seat, 0) + extra
+        return contributions
+
+    @staticmethod
+    def _hero_pot_components(
+        request: Any,
+        continuing: set[int],
+        contributions: dict[int, int],
+        final_pot: int,
+    ) -> tuple[float, float]:
+        """Return guaranteed/refunded chips and the hero-contestable pot."""
+
+        hero_contribution = max(0, contributions.get(request.your_seat, 0))
+        opponent_cap = max(
+            (contributions.get(seat, 0) for seat in continuing),
+            default=0,
+        )
+        hero_eligible = min(
+            float(final_pot),
+            float(
+                sum(
+                    min(max(0, contribution), hero_contribution)
+                    for contribution in contributions.values()
+                )
+            ),
+        )
+        guaranteed = min(
+            hero_eligible,
+            float(
+                sum(
+                    max(
+                        0,
+                        min(max(0, contribution), hero_contribution) - opponent_cap,
+                    )
+                    for contribution in contributions.values()
+                )
+            ),
+        )
+        return guaranteed, max(0.0, hero_eligible - guaranteed)
+
+    @staticmethod
     def _award_to_likely_opponent(
         request: Any,
         opponents: list[Any],
         deltas: dict[int, float],
-        pot: int,
+        pot: float,
     ) -> None:
         if not opponents:
             return
@@ -431,11 +600,9 @@ class HighVariancePolicy:
     def _opponent_range(
         self, request: Any, player: Any, profile: Any, rule_model: Any
     ) -> list[float]:
-        actions = [
-            action
-            for action in request.current_hand_actions
-            if action.seat == player.seat
-        ]
+        # The profile filters by seat itself; it still needs the full action
+        # sequence to reconstruct what amount the target was facing.
+        actions = request.current_hand_actions
         position = self._position_bucket(request, player.seat)
         try:
             result = profile.range_for_action_history(
@@ -465,9 +632,16 @@ class HighVariancePolicy:
         size_ratio: float,
         strength: float,
     ) -> float:
-        size_bucket = (
-            "small" if size_ratio <= 0.40 else "medium" if size_ratio <= 0.90 else "large"
-        )
+        if size_ratio <= 0.40:
+            size_bucket = "small"
+        elif size_ratio <= 0.90:
+            size_bucket = "medium"
+        elif size_ratio <= 1.50:
+            size_bucket = "large"
+        elif size_ratio < 3.0:
+            size_bucket = "overbet"
+        else:
+            size_bucket = "all_in"
         try:
             probability = profile.continue_probability(
                 round_name=request.round,
@@ -483,6 +657,37 @@ class HighVariancePolicy:
         except (AttributeError, TypeError, ValueError):
             pressure = 0.17 * math.log2(1.0 + max(0.0, size_ratio))
             return min(0.94, max(0.04, 0.14 + 0.76 * strength - pressure))
+
+    def _range_conditioned_on_continue(
+        self,
+        card_range: list[float],
+        profile: Any,
+        request: Any,
+        player: Any,
+        rule_model: Any,
+        size_ratio: float,
+    ) -> list[float]:
+        """Bayes-update a range on the observed event that a wager is continued."""
+
+        weights: list[float] = []
+        for number, prior in enumerate(card_range, 1):
+            if request.community_number is None:
+                strength = sum(
+                    rule_model.strength(number, community)
+                    for community in range(1, 14)
+                ) / 13.0
+            else:
+                strength = rule_model.strength(number, request.community_number)
+            likelihood = self._continue_probability(
+                profile, request, player, size_ratio, strength
+            )
+            weights.append(max(0.0, prior) * likelihood)
+        total = sum(weights)
+        return (
+            [weight / total for weight in weights]
+            if total > 0.0
+            else list(card_range)
+        )
 
     @staticmethod
     def _range_strength(
@@ -510,7 +715,12 @@ class HighVariancePolicy:
         after_button = [value for value in live if value > request.button_seat] + [
             value for value in live if value <= request.button_seat
         ]
-        if request.round == "pre_reveal" and len(after_button) > 2:
+        if request.round == "pre_reveal" and len(after_button) == 2:
+            # The main protocol documents the button/small-blind acting first
+            # when a busted table reaches heads-up.
+            other = next(value for value in live if value != request.button_seat)
+            order = [request.button_seat, other]
+        elif request.round == "pre_reveal" and len(after_button) > 2:
             order = after_button[2:] + after_button[:2]
         else:
             order = after_button
@@ -525,8 +735,7 @@ class HighVariancePolicy:
     @staticmethod
     def _observed_scout_calls(request: Any) -> int:
         total = 0
-        histories = list(request.recent_hands)
-        for hand in histories:
+        for hand in request.recent_hands:
             if hand.hand_number > 10:
                 continue
             previous: dict[tuple[int, str], int] = {}
@@ -537,4 +746,47 @@ class HighVariancePolicy:
                     previous[key] = action.amount
                 if action.seat == request.your_seat and action.action == "call":
                     total += max(0, (action.amount or before) - before)
+        if request.hand_number <= 10:
+            previous: dict[tuple[int, str], int] = {}
+            for action in request.current_hand_actions:
+                key = (action.seat, action.round)
+                before = previous.get(key, 0)
+                if action.amount is not None:
+                    previous[key] = action.amount
+                if action.seat == request.your_seat and action.action == "call":
+                    total += max(0, (action.amount or before) - before)
         return total
+
+    @staticmethod
+    def _passive_is_safe(request: Any, action: str) -> bool:
+        """Whether folding/checking preserves a clear under the worst pot award."""
+
+        hero_delta = request.your_stack - request.starting_stack
+        if hero_delta < 10:
+            return False
+        worst_other = max(
+            (
+                player.stack
+                - request.starting_stack
+                + request.pot
+                for player in request.players
+                if player.seat != request.your_seat and not player.busted
+            ),
+            default=-request.starting_stack,
+        )
+        return hero_delta > worst_other
+
+    @staticmethod
+    def _passive_can_clear(request: Any) -> bool:
+        """Best-case terminal clear bound for checking the current hand."""
+
+        hero_delta = request.your_stack + request.pot - request.starting_stack
+        leader = max(
+            (
+                player.stack - request.starting_stack
+                for player in request.players
+                if player.seat != request.your_seat and not player.busted
+            ),
+            default=-request.starting_stack,
+        )
+        return hero_delta >= 10 and hero_delta > leader

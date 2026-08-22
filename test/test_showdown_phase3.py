@@ -16,8 +16,13 @@ from app.phase3.showdown.engine import (
     reset_runtime_for_tests,
     runtime_snapshot,
 )
-from app.phase3.showdown.equity import exact_share_for_hypothesis, showdown_share
+from app.phase3.showdown.equity import (
+    exact_share_for_hypothesis,
+    showdown_metrics_by_subset,
+    showdown_share,
+)
 from app.phase3.showdown.learning import EventKnowledge, OpponentProfile, RuntimeStore
+from app.phase3.showdown.policy import HighVariancePolicy
 from app.phase3.showdown.protocol import (
     ActionRecord,
     ProtocolError,
@@ -158,6 +163,19 @@ class RuleAndEquityTests(unittest.TestCase):
             places=12,
         )
 
+        opponents = {seat: None for seat in range(1, 6)}
+        metrics = showdown_metrics_by_subset(7, 7, opponents, model)[
+            frozenset(opponents)
+        ]
+        self.assertAlmostEqual(metrics.expected_share, equity, places=12)
+        self.assertAlmostEqual(
+            metrics.sole_win_probability, (12.0 / 13.0) ** 5, places=12
+        )
+        self.assertAlmostEqual(metrics.loss_probability, 0.0, places=12)
+        self.assertAlmostEqual(
+            sum(metrics.split_probabilities), 1.0, places=12
+        )
+
     def test_candidate_rule_converges_from_unambiguous_showdowns(self) -> None:
         model = RuleModel("synthetic-near")
         hypothesis = get_hypothesis("community-near-high")
@@ -219,6 +237,14 @@ class LearningTests(unittest.TestCase):
         self.assertEqual(first.processed_hands, {1})
         self.assertEqual(store.knowledge.get_rule("test-codename").observation_count, 1)
 
+    def test_reused_match_identifier_resets_on_hand_one(self) -> None:
+        store = RuntimeStore(knowledge=EventKnowledge())
+        old = store.ingest(parse_payload(payload(match_id="reused", hand_number=20)))
+        fresh = store.ingest(parse_payload(payload(match_id="reused", hand_number=1)))
+        self.assertIsNot(old, fresh)
+        self.assertEqual(fresh.last_hand_number, 1)
+        self.assertFalse(fresh.processed_hands)
+
     def test_action_conditioned_range_is_normalized_and_directional(self) -> None:
         profile = OpponentProfile("Dana")
         for _ in range(30):
@@ -264,6 +290,22 @@ class LearningTests(unittest.TestCase):
         self.assertEqual(restored.source_hashes, {"abc"})
         self.assertEqual(restored.get_rule("opal").observation_count, 1)
         self.assertGreater(restored.get_opponent("Rhea").observations, 0)
+
+    def test_identical_number_split_is_safe_rule_evidence(self) -> None:
+        knowledge = EventKnowledge()
+        applied = knowledge.observe_hand(
+            "split-rule",
+            {
+                "hand_number": 4,
+                "community_number": 9,
+                "winners": [1, 2],
+                "pot": 20,
+                "shown_numbers": {"0": 8, "1": 9, "2": 9},
+                "actions": [],
+            },
+        )
+        self.assertTrue(applied)
+        self.assertEqual(knowledge.get_rule("split-rule").observation_count, 1)
 
 
 class ReplayTests(unittest.TestCase):
@@ -311,6 +353,139 @@ class ReplayTests(unittest.TestCase):
             self.assertEqual(duplicate.duplicate_files, 1)
             self.assertEqual(duplicate.hands_added, 0)
 
+    def test_nested_camelcase_replay_inherits_hero_and_mapped_reveals(self) -> None:
+        document = {
+            "yourSeat": 0,
+            "players": [
+                {"seat": seat, "name": "Contestant" if seat == 0 else NAMES[seat]}
+                for seat in range(6)
+            ],
+            "legs": [
+                {
+                    "tableRule": "amber",
+                    "handHistory": [
+                        {
+                            "handNumber": 1,
+                            "communityNumber": 4,
+                            "winners": [1],
+                            "pot": 14,
+                            "players": {
+                                "0": {"number": 9, "shown": True},
+                                "1": {"number": 4, "shown": True},
+                            },
+                            "actions": [
+                                {"street": "pre_reveal", "seat": 0, "type": "raise", "amount": 6},
+                                {"street": "pre_reveal", "seat": 1, "type": "call", "amount": 6},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            replay = Path(directory) / "nested.json"
+            replay.write_text(json.dumps(document), encoding="utf-8")
+            knowledge, report = fit_replays([replay])
+        self.assertEqual(report.hands_added, 1)
+        self.assertEqual(knowledge.get_rule("amber").observation_count, 1)
+        self.assertNotIn("Contestant", knowledge.opponents)
+        self.assertGreater(knowledge.get_opponent("Dana").observations, 0)
+
+    def test_boolean_cards_are_not_coerced_to_number_one(self) -> None:
+        document = {
+            "table_rule": "boolean",
+            "players": [{"seat": 0, "name": "you"}, {"seat": 1, "name": "Dana"}],
+            "hands": [
+                {
+                    "hand_number": 1,
+                    "community_number": 5,
+                    "winners": [1],
+                    "pot": 8,
+                    "shown_numbers": {"0": True, "1": 5},
+                    "actions": [],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            replay = Path(directory) / "booleans.json"
+            replay.write_text(json.dumps(document), encoding="utf-8")
+            knowledge, _report = fit_replays([replay])
+        self.assertEqual(knowledge.get_rule("boolean").observation_count, 0)
+
+    def test_replay_channels_can_recover_rule_after_profile_only_import(self) -> None:
+        base = {
+            "match_id": "recoverable",
+            "table_rule": "amber",
+            "your_seat": 0,
+            "players": [
+                {"seat": seat, "name": name} for seat, name in enumerate(NAMES)
+            ],
+            "hands": [
+                {
+                    "hand_number": 1,
+                    "community_number": 4,
+                    "winners": [{"unknown_winner_field": 1}],
+                    "pot": 12,
+                    "shown_numbers": {"0": 9, "1": 4},
+                    "full_numbers": {"0": 9, "1": 4},
+                    "actions": [
+                        {
+                            "round": "pre_reveal",
+                            "seat": 1,
+                            "action": "call",
+                            "amount": 2,
+                        }
+                    ],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            first = Path(directory) / "first.json"
+            corrected = Path(directory) / "corrected.json"
+            seed = Path(directory) / "seed.json"
+            first.write_text(json.dumps(base), encoding="utf-8")
+            knowledge, initial = fit_replays([first])
+            self.assertEqual(initial.hands_added, 1)
+            self.assertEqual(knowledge.get_rule("amber").observation_count, 0)
+            write_seed(knowledge, seed)
+
+            base["hands"][0]["winners"] = [{"player_id": 1}]
+            corrected.write_text(json.dumps(base), encoding="utf-8")
+            recovered, report = fit_replays([corrected], seed_path=seed)
+        self.assertEqual(report.hands_added, 1)
+        self.assertEqual(recovered.get_rule("amber").observation_count, 1)
+
+    def test_replay_rejects_boolean_action_seat_and_identity_conflicts(self) -> None:
+        first = {
+            "match_id": "same-id",
+            "table_rule": "opal",
+            "players": [{"seat": 0, "name": "you"}, {"seat": 1, "name": "Dana"}],
+            "hands": [
+                {
+                    "hand_number": 1,
+                    "community_number": 5,
+                    "winners": [{"player": 1}],
+                    "pot": 8,
+                    "shown_numbers": {"0": 2, "1": 5},
+                    "actions": [
+                        {"round": "pre_reveal", "seat": True, "action": "call", "amount": 2}
+                    ],
+                }
+            ],
+        }
+        second = json.loads(json.dumps(first))
+        second["hands"][0]["shown_numbers"]["0"] = 3
+        with tempfile.TemporaryDirectory() as directory:
+            first_path = Path(directory) / "first.json"
+            second_path = Path(directory) / "second.json"
+            first_path.write_text(json.dumps(first), encoding="utf-8")
+            second_path.write_text(json.dumps(second), encoding="utf-8")
+            learned, _report = fit_replays([first_path])
+            self.assertEqual(learned.get_rule("opal").observation_count, 1)
+            self.assertNotIn("Dana", learned.opponents)
+            with self.assertRaises(ValueError):
+                fit_replays([first_path, second_path])
+
 
 class ServiceAndSimulatorTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -348,6 +523,109 @@ class ServiceAndSimulatorTests(unittest.TestCase):
         self.assertEqual(
             decide_move(malformed), {"action": "raise", "amount": 200}
         )
+
+    def test_final_hand_uses_exact_leaderboard_target(self) -> None:
+        leading_players = [
+            player(0, stack=210, delta=10),
+            player(1, stack=204, delta=5, bet=1),
+            player(2, stack=197, delta=-1, bet=2),
+            player(3, stack=198, delta=-2),
+            player(4, stack=197, delta=-3),
+            player(5, stack=194, delta=-9),
+        ]
+        protect = payload(
+            players=leading_players,
+            your_stack=210,
+            hand_number=60,
+            round="post_reveal",
+            community_number=7,
+            your_number=1,
+            pot=3,
+            to_call=0,
+            legal_actions=["check", "bet"],
+            min_raise_to=2,
+            max_raise_to=210,
+        )
+        self.assertEqual(decide_move(protect), {"action": "check"})
+
+        trailing_players = [
+            player(0, stack=200, delta=0),
+            player(1, stack=219, delta=20, bet=1),
+            player(2, stack=198, delta=-1, bet=2),
+            player(3, stack=195, delta=-5),
+            player(4, stack=195, delta=-5),
+            player(5, stack=193, delta=-9),
+        ]
+        attack = payload(
+            players=trailing_players,
+            your_stack=200,
+            hand_number=60,
+            round="post_reveal",
+            community_number=13,
+            your_number=6,
+            pot=3,
+            to_call=0,
+            legal_actions=["check", "bet"],
+            min_raise_to=2,
+            max_raise_to=200,
+        )
+        self.assertEqual(decide_move(attack)["action"], "bet")
+
+    def test_penultimate_hand_protects_a_safe_unique_lead(self) -> None:
+        players = [
+            player(0, stack=220, delta=20),
+            player(1, stack=205, delta=5),
+            player(2, stack=198, delta=-2),
+            player(3, stack=195, delta=-5),
+            player(4, stack=192, delta=-8),
+            player(5, stack=190, delta=-10),
+        ]
+        raw = payload(
+            players=players,
+            your_stack=220,
+            hand_number=59,
+            round="post_reveal",
+            community_number=7,
+            your_number=13,
+            pot=0,
+            to_call=0,
+            legal_actions=["check", "bet"],
+            min_raise_to=2,
+            max_raise_to=220,
+        )
+        self.assertEqual(decide_move(raw), {"action": "check"})
+
+    def test_scout_budget_counts_calls_in_current_hand(self) -> None:
+        players = [
+            player(0, stack=185, bet=15, delta=0),
+            player(1, stack=175, bet=25, delta=0),
+            player(2, stack=198, bet=2),
+            player(3),
+            player(4),
+            player(5),
+        ]
+        raw = payload(
+            players=players,
+            your_stack=185,
+            your_number=1,
+            pot=42,
+            to_call=10,
+            current_hand_actions=[
+                {"round": "pre_reveal", "seat": 0, "action": "call", "amount": 15},
+                {"round": "pre_reveal", "seat": 1, "action": "raise", "amount": 25},
+            ],
+        )
+        self.assertEqual(decide_move(raw)["action"], "fold")
+
+    def test_sidepot_components_cap_hero_eligibility_and_refund_excess(self) -> None:
+        request = parse_payload(payload())
+        guaranteed, contestable = HighVariancePolicy._hero_pot_components(
+            request,
+            {1},
+            {0: 100, 1: 50, 2: 100},
+            250,
+        )
+        self.assertEqual((guaranteed, contestable), (100.0, 150.0))
 
     def test_duplicate_history_does_not_double_train_service(self) -> None:
         recent = {

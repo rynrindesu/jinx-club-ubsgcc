@@ -325,6 +325,7 @@ class RuleModel:
         "_pairwise",
         "_observations",
         "_fit_sum",
+        "_strength_cache",
     )
 
     def __init__(self, codename: str):
@@ -335,6 +336,7 @@ class RuleModel:
         self._pairwise: dict[tuple[int, int, int], float] = {}
         self._observations = 0
         self._fit_sum = 0.0
+        self._strength_cache: dict[tuple[int, int], float] = {}
 
     @property
     def observation_count(self) -> int:
@@ -479,10 +481,16 @@ class RuleModel:
 
         number = _card(number)
         community = _card(community, "community")
-        return sum(
+        key = (number, community)
+        cached = self._strength_cache.get(key)
+        if cached is not None:
+            return cached
+        result = sum(
             self.comparison_probability(number, opponent, community)
             for opponent in range(CARD_MIN, CARD_MAX + 1)
         ) / CARD_MAX
+        self._strength_cache[key] = result
+        return result
 
     def observe_showdown(
         self,
@@ -554,6 +562,7 @@ class RuleModel:
                 # a community is seen but cannot override direct evidence.
                 global_key = (0, winner_number, loser_number)
                 self._pairwise[global_key] = self._pairwise.get(global_key, 0.0) + 0.30
+        self._strength_cache.clear()
         return True
 
     def to_dict(self) -> dict[str, Any]:

@@ -23,6 +23,9 @@ from .protocol import ACTIONS, ActionRecord, MoveRequest, Player, RecentHand
 PROFILE_ACTIONS = ("fold", "check", "call", "bet", "raise")
 _CONTEXT_SEPARATOR = "|"
 _UNKNOWN = "unknown"
+MAX_RULE_MODELS = 32
+MAX_OPPONENT_PROFILES = 64
+MAX_RUNTIME_SESSIONS = 64
 
 
 def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
@@ -192,10 +195,17 @@ def _rule_strength(
     community: int | None,
     round_name: str,
 ) -> float:
-    # Pre-reveal decisions cannot depend on a community value that had not yet
-    # been dealt.  Raw number percentile is a neutral, rule-agnostic proxy.
+    # Pre-reveal decisions integrate all 13 possible communities.  This uses no
+    # future information and lets learned behaviour transfer to low/distance
+    # rules instead of assuming that a numerically high card is always strong.
     if round_name != "post_reveal" or community is None:
-        return (number - 1) / 12.0
+        try:
+            return _clamp(
+                sum(float(rule_model.strength(number, value)) for value in range(1, 14))
+                / 13.0
+            )
+        except (AttributeError, TypeError, ValueError, ArithmeticError):
+            return (number - 1) / 12.0
     try:
         return _clamp(float(rule_model.strength(number, community)))
     except (AttributeError, TypeError, ValueError, ArithmeticError):
@@ -640,6 +650,8 @@ class EventKnowledge:
         if not codename:
             raise ValueError("table-rule codename cannot be empty")
         if codename not in self.rules:
+            if len(self.rules) >= MAX_RULE_MODELS:
+                self.rules.pop(next(iter(self.rules)))
             self.rules[codename] = _new_rule_model(codename)
         return self.rules[codename]
 
@@ -648,6 +660,8 @@ class EventKnowledge:
         if not name:
             name = _UNKNOWN
         if name not in self.opponents:
+            if len(self.opponents) >= MAX_OPPONENT_PROFILES:
+                self.opponents.pop(next(iter(self.opponents)))
             self.opponents[name] = OpponentProfile(name=name)
         return self.opponents[name]
 
@@ -678,6 +692,9 @@ class EventKnowledge:
         hand_key: str | int | None = None,
         your_seat: int | None = None,
         big_blind: int = 2,
+        small_blind: int | None = None,
+        learn_rules: bool = True,
+        learn_opponents: bool = True,
     ) -> bool:
         """Learn from one completed hand.
 
@@ -712,7 +729,12 @@ class EventKnowledge:
                         try:
                             action_name = str(entry.get("action", "")).lower()
                             street = str(entry.get("round", ""))
-                            seat = int(entry.get("seat"))
+                            raw_seat = entry.get("seat")
+                            if isinstance(raw_seat, bool):
+                                continue
+                            seat = int(raw_seat)
+                            if seat < 0:
+                                continue
                             if action_name not in ACTIONS or street not in {
                                 "pre_reveal",
                                 "post_reveal",
@@ -785,11 +807,15 @@ class EventKnowledge:
                     and 1 <= community_raw <= 13
                     else None
                 )
+                raw_hand_number = hand.get("hand_number", 0)
+                raw_pot = hand.get("pot", 0)
+                if isinstance(raw_hand_number, bool) or isinstance(raw_pot, bool):
+                    return False
                 parsed = RecentHand(
-                    hand_number=int(hand.get("hand_number", 0)),
+                    hand_number=int(raw_hand_number),
                     community_number=community,
                     winners=winners,
-                    pot=max(0, int(hand.get("pot", 0))),
+                    pot=max(0, int(raw_pot)),
                     shown_numbers=_coerce_seat_number_map(
                         hand.get("shown_numbers", {})
                     ),
@@ -806,6 +832,9 @@ class EventKnowledge:
         else:
             return False
 
+        if parsed.hand_number < 1:
+            return False
+
         if full_numbers is None and raw_hand is not None:
             for candidate_key in (
                 "full_numbers",
@@ -817,36 +846,49 @@ class EventKnowledge:
                 if isinstance(candidate, Mapping):
                     full_numbers = candidate  # type: ignore[assignment]
                     break
+        full_number_map = _coerce_seat_number_map(full_numbers)
         known_numbers = dict(parsed.shown_numbers)
-        known_numbers.update(_coerce_seat_number_map(full_numbers))
+        known_numbers.update(full_number_map)
 
         rule = self.get_rule(table_rule)
+        winner_numbers = [
+            parsed.shown_numbers[winner]
+            for winner in parsed.winners
+            if winner in parsed.shown_numbers
+        ]
+        safe_split = (
+            len(parsed.winners) > 1
+            and len(winner_numbers) == len(parsed.winners)
+            and len(set(winner_numbers)) == 1
+        )
         ambiguous = (
             parsed.community_number is None
-            or len(parsed.winners) != 1
+            or (len(parsed.winners) != 1 and not safe_split)
             or len(parsed.shown_numbers) < 2
-            or parsed.winners[0] not in parsed.shown_numbers
+            or not parsed.winners
+            or any(winner not in parsed.shown_numbers for winner in parsed.winners)
         )
         if raw_hand is not None and (
             raw_hand.get("side_pots") or raw_hand.get("multiple_pots")
         ):
             ambiguous = True
-        if not ambiguous:
+        learned_rule = False
+        if learn_rules and not ambiguous:
             try:
-                rule.observe_showdown(
+                learned_rule = bool(rule.observe_showdown(
                     parsed.community_number,
                     parsed.shown_numbers,
                     parsed.winners,
                     ambiguous=False,
-                )
+                ))
             except TypeError:
                 # Accommodate minimal rule-model implementations used in tests.
                 try:
-                    rule.observe_showdown(
+                    learned_rule = bool(rule.observe_showdown(
                         parsed.community_number,
                         parsed.shown_numbers,
                         parsed.winners,
-                    )
+                    ))
                 except (AttributeError, TypeError, ValueError):
                     pass
             except (AttributeError, ValueError, ArithmeticError):
@@ -863,17 +905,36 @@ class EventKnowledge:
                 if name:
                     seat_names[seat] = name
 
-        active_seats = sorted(seat_names) or sorted(known_numbers) or sorted(
+        active_seats = sorted(full_number_map) or sorted(seat_names) or sorted(known_numbers) or sorted(
             parsed.shown_numbers
         )
         live_now = max(2, len(active_seats))
+        derived_small_blind = (
+            max(0, big_blind // 2) if small_blind is None else max(0, small_blind)
+        )
         contributions: dict[str, dict[int, int]] = {
             "pre_reveal": defaultdict(int),
             "post_reveal": defaultdict(int),
         }
+        if parsed.button_seat in active_seats and len(active_seats) >= 2:
+            button_index = active_seats.index(parsed.button_seat)
+            clockwise = (
+                active_seats[button_index + 1 :]
+                + active_seats[: button_index + 1]
+            )
+            if len(active_seats) == 2:
+                small_seat = parsed.button_seat
+                big_seat = next(
+                    seat for seat in active_seats if seat != parsed.button_seat
+                )
+            else:
+                small_seat, big_seat = clockwise[:2]
+            contributions["pre_reveal"][small_seat] = derived_small_blind
+            contributions["pre_reveal"][big_seat] = max(0, big_blind)
         current_max = {"pre_reveal": max(0, big_blind), "post_reveal": 0}
         last_aggression_size = {"pre_reveal": _UNKNOWN, "post_reveal": _UNKNOWN}
-        estimated_pot = max(0, big_blind) + max(0, big_blind // 2)
+        estimated_pot = max(0, big_blind) + derived_small_blind
+        learned_actions = 0
 
         for action in parsed.actions:
             street = action.round
@@ -887,7 +948,7 @@ class EventKnowledge:
             faced_size = last_aggression_size[street] if facing else "none"
             player_name = seat_names.get(action.seat)
             private_number = known_numbers.get(action.seat)
-            if (
+            if learn_opponents and (
                 player_name
                 and player_name.lower() != "you"
                 and (your_seat is None or action.seat != your_seat)
@@ -919,6 +980,7 @@ class EventKnowledge:
                     position_bucket=action_position,
                     strength=strength,
                 )
+                learned_actions += 1
 
             if action.amount is not None:
                 increment = max(0, action.amount - before)
@@ -938,9 +1000,10 @@ class EventKnowledge:
             if action.action == "fold":
                 live_now = max(1, live_now - 1)
 
-        if dedupe_key is not None:
+        learned = learned_rule or learned_actions > 0
+        if dedupe_key is not None and learned:
             self.observation_keys.add(dedupe_key)
-        return True
+        return learned
 
     def to_dict(self) -> dict[str, Any]:
         rules: dict[str, Any] = {}
@@ -1045,13 +1108,23 @@ class RuntimeStore:
         with self.lock:
             key = request.session_key
             state = self.sessions.get(key)
-            if state is None:
+            if state is None or (
+                request.hand_number == 1 and state.last_hand_number > 1
+            ):
+                # A coordinator may reuse match_id across retries.  The empty
+                # first hand is authoritative evidence of a fresh match even if
+                # the external identifiers happen to be unchanged.
                 state = MatchState(
                     match_id=request.match_id,
                     leg_number=request.leg_number,
                     table_rule=request.table_rule,
                 )
                 self.sessions[key] = state
+                while len(self.sessions) > MAX_RUNTIME_SESSIONS:
+                    oldest = next(
+                        candidate for candidate in self.sessions if candidate != key
+                    )
+                    self.sessions.pop(oldest)
 
             players_by_seat = request.players_by_seat
             for hand in request.recent_hands:
@@ -1064,6 +1137,7 @@ class RuntimeStore:
                         players_by_seat,
                         your_seat=request.your_seat,
                         big_blind=request.big_blind,
+                        small_blind=request.small_blind,
                     )
                 except (AttributeError, TypeError, ValueError, ArithmeticError):
                     # Learning is advisory.  A malformed historical observation

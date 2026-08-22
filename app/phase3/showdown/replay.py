@@ -40,6 +40,51 @@ class ReplayFitReport:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class _ReplayRecord:
+    file_hash: str
+    observation_source: str
+    hand_key: str
+    rule: str
+    hand: Mapping[str, Any]
+    players_by_seat: Mapping[int, Mapping[str, Any] | str]
+    full_numbers: Mapping[int, int]
+    your_seat: int | None
+    small_blind: int
+    big_blind: int
+
+
+def _record_signature(record: _ReplayRecord) -> str:
+    """Return a stable semantic fingerprint, excluding file provenance."""
+
+    payload = {
+        "rule": record.rule,
+        "hand": record.hand,
+        "players": record.players_by_seat,
+        "full_numbers": record.full_numbers,
+        "your_seat": record.your_seat,
+        "small_blind": record.small_blind,
+        "big_blind": record.big_blind,
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+def _channel_key(observation_key: str, channel: str) -> str:
+    return f"{observation_key}:{channel}"
+
+
+def _channel_done(knowledge: EventKnowledge, observation_key: str, channel: str) -> bool:
+    # Seeds produced before channel-specific replay deduplication stored the base
+    # key.  Treat those entries as complete for backwards-compatible idempotence.
+    return observation_key in knowledge.observation_keys or _channel_key(
+        observation_key, channel
+    ) in knowledge.observation_keys
+
+
 def _value(item: Mapping[str, Any], *names: str, default: Any = None) -> Any:
     for name in names:
         if name in item:
@@ -58,6 +103,8 @@ def _players(value: Any) -> dict[int, Mapping[str, Any] | str]:
     if isinstance(value, Mapping):
         for raw_seat, player in value.items():
             try:
+                if isinstance(raw_seat, bool):
+                    continue
                 result[int(raw_seat)] = player
             except (TypeError, ValueError):
                 continue
@@ -68,7 +115,10 @@ def _players(value: Any) -> dict[int, Mapping[str, Any] | str]:
         if not isinstance(player, Mapping):
             continue
         try:
-            seat = int(_value(player, "seat", "seat_number", "seatNumber", default=index))
+            raw_seat = _value(player, "seat", "seat_number", "seatNumber", default=index)
+            if isinstance(raw_seat, bool):
+                continue
+            seat = int(raw_seat)
         except (TypeError, ValueError):
             continue
         result[seat] = player
@@ -79,6 +129,8 @@ def _number_map(value: Any) -> dict[int, int]:
     result: dict[int, int] = {}
     if isinstance(value, Mapping):
         for raw_seat, raw_number in value.items():
+            if isinstance(raw_seat, bool):
+                continue
             if isinstance(raw_number, Mapping):
                 raw_number = _value(
                     raw_number,
@@ -88,6 +140,8 @@ def _number_map(value: Any) -> dict[int, int]:
                     "card",
                 )
             try:
+                if isinstance(raw_number, bool):
+                    continue
                 seat, number = int(raw_seat), int(raw_number)
             except (TypeError, ValueError):
                 continue
@@ -99,16 +153,18 @@ def _number_map(value: Any) -> dict[int, int]:
             if not isinstance(entry, Mapping):
                 continue
             try:
-                seat = int(_value(entry, "seat", "seat_number", "seatNumber", default=index))
-                number = int(
-                    _value(
-                        entry,
-                        "number",
-                        "private_number",
-                        "privateNumber",
-                        "card",
-                    )
+                raw_seat = _value(entry, "seat", "seat_number", "seatNumber", default=index)
+                raw_number = _value(
+                    entry,
+                    "number",
+                    "private_number",
+                    "privateNumber",
+                    "card",
                 )
+                if isinstance(raw_seat, bool) or isinstance(raw_number, bool):
+                    continue
+                seat = int(raw_seat)
+                number = int(raw_number)
             except (TypeError, ValueError):
                 continue
             if seat >= 0 and 1 <= number <= 13:
@@ -141,9 +197,14 @@ def _shown_numbers(hand: Mapping[str, Any], full: Mapping[int, int]) -> dict[int
 
     # Some raw exports mark each seat rather than providing a separate mapping.
     players = hand.get("players")
-    if _is_array(players):
+    if _is_array(players) or isinstance(players, Mapping):
         shown: dict[int, int] = {}
-        for index, player in enumerate(players):
+        entries = (
+            list(players.items())
+            if isinstance(players, Mapping)
+            else list(enumerate(players))
+        )
+        for raw_index, player in entries:
             if not isinstance(player, Mapping):
                 continue
             explicitly_shown = bool(
@@ -152,7 +213,10 @@ def _shown_numbers(hand: Mapping[str, Any], full: Mapping[int, int]) -> dict[int
             if not explicitly_shown:
                 continue
             try:
-                seat = int(_value(player, "seat", default=index))
+                raw_seat = _value(player, "seat", default=raw_index)
+                if isinstance(raw_seat, bool):
+                    continue
+                seat = int(raw_seat)
             except (TypeError, ValueError):
                 continue
             if seat in full:
@@ -170,8 +234,19 @@ def _winners(value: Any) -> list[int]:
     result: list[int] = []
     for winner in value:
         if isinstance(winner, Mapping):
-            winner = _value(winner, "seat", "player_seat", "playerSeat", "id")
+            winner = _value(
+                winner,
+                "seat",
+                "player_seat",
+                "playerSeat",
+                "player_id",
+                "playerId",
+                "player",
+                "id",
+            )
         try:
+            if isinstance(winner, bool):
+                continue
             seat = int(winner)
         except (TypeError, ValueError):
             continue
@@ -187,9 +262,12 @@ def _actions(value: Any) -> list[dict[str, Any]]:
     for action in value:
         if not isinstance(action, Mapping):
             continue
+        raw_seat = _value(action, "seat", "player_seat", "playerSeat")
+        if isinstance(raw_seat, bool):
+            continue
         normalized = {
             "round": _value(action, "round", "street"),
-            "seat": _value(action, "seat", "player_seat", "playerSeat"),
+            "seat": raw_seat,
             "action": _value(action, "action", "type"),
         }
         for target, names in {
@@ -210,22 +288,46 @@ def _iter_match_containers(
     node: Any,
     inherited_rule: str | None = None,
     inherited_players: dict[int, Mapping[str, Any] | str] | None = None,
-) -> Iterable[tuple[str, Mapping[str, Any], Sequence[Any], dict[int, Mapping[str, Any] | str]]]:
+    inherited_your_seat: int | None = None,
+) -> Iterable[
+    tuple[
+        str,
+        Mapping[str, Any],
+        Sequence[Any],
+        dict[int, Mapping[str, Any] | str],
+        int | None,
+    ]
+]:
     """Yield containers that own a hands array without double-walking it."""
 
     if isinstance(node, Mapping):
         raw_rule = _value(node, "table_rule", "tableRule", default=inherited_rule)
         rule = str(raw_rule).strip() if raw_rule is not None else inherited_rule
         local_players = _players(node.get("players")) or inherited_players or {}
+        raw_your_seat = _value(
+            node, "your_seat", "yourSeat", default=inherited_your_seat
+        )
+        try:
+            local_your_seat = (
+                int(raw_your_seat)
+                if raw_your_seat is not None and not isinstance(raw_your_seat, bool)
+                else inherited_your_seat
+            )
+        except (TypeError, ValueError):
+            local_your_seat = inherited_your_seat
         hands = _value(node, "hands", "hand_history", "handHistory")
         if rule and _is_array(hands):
-            yield rule, node, hands, local_players
+            yield rule, node, hands, local_players, local_your_seat
             return
         for value in node.values():
-            yield from _iter_match_containers(value, rule, local_players)
+            yield from _iter_match_containers(
+                value, rule, local_players, local_your_seat
+            )
     elif _is_array(node):
         for value in node:
-            yield from _iter_match_containers(value, inherited_rule, inherited_players)
+            yield from _iter_match_containers(
+                value, inherited_rule, inherited_players, inherited_your_seat
+            )
 
 
 def _normalise_hand(hand: Mapping[str, Any], index: int) -> tuple[dict[str, Any], dict[int, int]]:
@@ -252,12 +354,17 @@ def load_seed(path: str | Path | None) -> EventKnowledge:
         return EventKnowledge()
     seed = Path(path)
     if not seed.is_file():
-        return EventKnowledge()
+        raise FileNotFoundError(f"seed file does not exist: {seed}")
     try:
         data = json.loads(seed.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return EventKnowledge()
-    return EventKnowledge.from_dict(data) if isinstance(data, Mapping) else EventKnowledge()
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"seed file is not valid JSON: {seed}") from exc
+    if not isinstance(data, Mapping):
+        raise ValueError("seed root must be a JSON object")
+    version = data.get("version", 1)
+    if isinstance(version, bool) or version != 1:
+        raise ValueError(f"unsupported knowledge seed version: {version!r}")
+    return EventKnowledge.from_dict(data)
 
 
 def fit_replays(
@@ -267,43 +374,150 @@ def fit_replays(
 ) -> tuple[EventKnowledge, ReplayFitReport]:
     knowledge = load_seed(seed_path)
     files_seen = files_added = hands_added = duplicates = 0
+    pending: dict[str, _ReplayRecord] = {}
+    pending_hashes: set[str] = set()
+    file_record_keys: dict[str, set[str]] = {}
 
     for raw_path in paths:
         files_seen += 1
         path = Path(raw_path)
         raw = path.read_bytes()
         source_hash = hashlib.sha256(raw).hexdigest()
-        if source_hash in knowledge.source_hashes:
+        if source_hash in knowledge.source_hashes or source_hash in pending_hashes:
             duplicates += 1
             continue
+        pending_hashes.add(source_hash)
         document = json.loads(raw)
-        source_hands = 0
-        for container_index, (rule, container, hands, players_by_seat) in enumerate(
+        file_record_keys[source_hash] = set()
+        for container_index, (
+            rule,
+            container,
+            hands,
+            players_by_seat,
+            inherited_your_seat,
+        ) in enumerate(
             _iter_match_containers(document)
         ):
             your_seat_raw = _value(container, "your_seat", "yourSeat")
             try:
-                your_seat = int(your_seat_raw) if your_seat_raw is not None else None
+                your_seat = (
+                    int(your_seat_raw)
+                    if your_seat_raw is not None and not isinstance(your_seat_raw, bool)
+                    else inherited_your_seat
+                )
             except (TypeError, ValueError):
                 your_seat = None
+            identity = _value(
+                container,
+                "match_id",
+                "matchId",
+                "run_id",
+                "runId",
+                "id",
+                default=f"{path.resolve()}:{container_index}",
+            )
+            leg_identity = _value(container, "leg_number", "legNumber")
+            if leg_identity is not None and not isinstance(leg_identity, bool):
+                identity = f"{identity}:leg-{leg_identity}"
+            observation_source = f"replay-v1:{rule}:{identity}"
+            raw_small_blind = _value(container, "small_blind", "smallBlind", default=1)
+            raw_big_blind = _value(container, "big_blind", "bigBlind", default=2)
+            try:
+                if isinstance(raw_small_blind, bool) or isinstance(raw_big_blind, bool):
+                    raise ValueError
+                small_blind = int(raw_small_blind)
+                big_blind = int(raw_big_blind)
+            except (TypeError, ValueError):
+                small_blind, big_blind = 1, 2
+            if small_blind < 0:
+                small_blind = 1
+            if big_blind < 0:
+                big_blind = 2
             for hand_index, hand in enumerate(hands):
                 if not isinstance(hand, Mapping):
                     continue
                 normalized, full = _normalise_hand(hand, hand_index)
-                hand_key = f"{container_index}:{normalized['hand_number']}"
-                if knowledge.observe_hand(
-                    rule,
-                    normalized,
-                    players_by_seat or _players(hand.get("players")),
-                    full,
-                    source_key=source_hash,
-                    hand_key=hand_key,
-                    your_seat=your_seat,
+                hand_key = str(normalized["hand_number"])
+                observation_key = f"{observation_source}:{hand_key}"
+                file_record_keys[source_hash].add(observation_key)
+                if _channel_done(knowledge, observation_key, "rule") and _channel_done(
+                    knowledge, observation_key, "opponents"
                 ):
-                    source_hands += 1
-        knowledge.source_hashes.add(source_hash)
-        files_added += 1
-        hands_added += source_hands
+                    continue
+                record = _ReplayRecord(
+                    file_hash=source_hash,
+                    observation_source=observation_source,
+                    hand_key=hand_key,
+                    rule=rule,
+                    hand=normalized,
+                    players_by_seat=(players_by_seat or _players(hand.get("players"))),
+                    full_numbers=full,
+                    your_seat=your_seat,
+                    small_blind=small_blind,
+                    big_blind=big_blind,
+                )
+                existing = pending.get(observation_key)
+                if existing is not None and _record_signature(existing) != _record_signature(
+                    record
+                ):
+                    raise ValueError(
+                        "conflicting replay records share identity "
+                        f"{observation_key!r}; provide a distinct match/run id"
+                    )
+                pending.setdefault(observation_key, record)
+
+    # Two deterministic passes make strength-bucket training independent of
+    # replay input order: first learn the rule, then classify opponent actions
+    # under the final posterior for this batch.
+    rule_results: dict[str, bool] = {}
+    for key, record in sorted(pending.items()):
+        if _channel_done(knowledge, key, "rule"):
+            rule_results[key] = False
+            continue
+        rule_results[key] = knowledge.observe_hand(
+            record.rule,
+            record.hand,
+            record.players_by_seat,
+            record.full_numbers,
+            your_seat=record.your_seat,
+            small_blind=record.small_blind,
+            big_blind=record.big_blind,
+            learn_rules=True,
+            learn_opponents=False,
+        )
+        if rule_results[key]:
+            knowledge.observation_keys.add(_channel_key(key, "rule"))
+
+    learned_keys: set[str] = {
+        key for key, learned in rule_results.items() if learned
+    }
+    for key, record in sorted(pending.items()):
+        if _channel_done(knowledge, key, "opponents"):
+            continue
+        learned_profiles = knowledge.observe_hand(
+            record.rule,
+            record.hand,
+            record.players_by_seat,
+            record.full_numbers,
+            your_seat=record.your_seat,
+            small_blind=record.small_blind,
+            big_blind=record.big_blind,
+            learn_rules=False,
+            learn_opponents=True,
+        )
+        if learned_profiles:
+            knowledge.observation_keys.add(_channel_key(key, "opponents"))
+            learned_keys.add(key)
+
+    hands_added = len(learned_keys)
+    for source_hash, record_keys in file_record_keys.items():
+        if any(
+            _channel_done(knowledge, key, "rule")
+            or _channel_done(knowledge, key, "opponents")
+            for key in record_keys
+        ):
+            knowledge.source_hashes.add(source_hash)
+            files_added += 1
 
     return knowledge, ReplayFitReport(
         files_seen=files_seen,

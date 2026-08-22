@@ -17,6 +17,10 @@ from typing import Any
 ACTIONS = frozenset({"fold", "check", "call", "bet", "raise"})
 SIZED_ACTIONS = frozenset({"bet", "raise"})
 ROUNDS = frozenset({"pre_reveal", "post_reveal"})
+MAX_PLAYERS = 16
+MAX_CURRENT_ACTIONS = 1024
+MAX_RECENT_HANDS = 20
+MAX_HISTORY_ACTIONS = 1024
 
 
 class ProtocolError(ValueError):
@@ -257,6 +261,11 @@ def _parse_actions(value: Any, field: str, *, tolerant: bool) -> tuple[ActionRec
     if value is None and tolerant:
         return ()
     sequence = _require_sequence(value, field)
+    limit = MAX_HISTORY_ACTIONS if tolerant else MAX_CURRENT_ACTIONS
+    if len(sequence) > limit:
+        if not tolerant:
+            raise ProtocolError(f"{field} exceeds the {limit}-action safety limit")
+        sequence = sequence[-limit:]
     parsed: list[ActionRecord] = []
     for index, action in enumerate(sequence):
         try:
@@ -371,6 +380,8 @@ def parse_payload(payload: Mapping[str, Any]) -> MoveRequest:
             raise ProtocolError("min_raise_to cannot exceed max_raise_to")
 
     players_raw = _require_sequence(data.get("players"), "players")
+    if len(players_raw) > MAX_PLAYERS:
+        raise ProtocolError(f"players exceeds the {MAX_PLAYERS}-seat safety limit")
     players = tuple(_parse_player(value, index) for index, value in enumerate(players_raw))
     if not players:
         raise ProtocolError("players must contain at least one seat")
@@ -397,7 +408,7 @@ def parse_payload(payload: Mapping[str, Any]) -> MoveRequest:
     recent: list[RecentHand] = []
     recent_raw = data.get("recent_hands", ())
     if _is_sequence(recent_raw):
-        for index, value in enumerate(recent_raw):
+        for index, value in enumerate(recent_raw[-MAX_RECENT_HANDS:]):
             try:
                 recent.append(_parse_recent_hand(value, index))
             except ProtocolError:
