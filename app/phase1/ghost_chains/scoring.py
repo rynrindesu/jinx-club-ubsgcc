@@ -20,7 +20,7 @@ class ScoreConfig:
     walk_discount: float = 0.45
     convergence_weight: float = 2.0
     convergence_scale: float = 4.0
-    open_route_capacity: float = 4.0
+    open_route_capacity: float = 2.0
     shortest_path_weight: float = 4.0
     closed_route_weight: float = 14.0
     risk_half_saturation: float = 8.0
@@ -92,10 +92,7 @@ class StructuralScore:
 class _RouteState:
     connectivity: Mapping[tuple[str, str], float]
     shortest_distances: Mapping[tuple[str, str], int]
-    shortest_confidences: Mapping[tuple[str, str], float]
-    shortest_completion_keys: Mapping[
-        tuple[str, str], tuple[datetime, int]
-    ]
+    closed_value: float
     direct_pairs: frozenset[tuple[str, str]]
 
 
@@ -137,12 +134,6 @@ class DiscountedWalkScorer:
         temporal_after = self._temporal_route_state((*relevant, candidate))
 
         topology = self._state_delta(candidate, topology_before, topology_after)
-        topology = self._apply_long_return_floor(
-            candidate,
-            relevant,
-            topology_before,
-            topology,
-        )
         temporal = self._state_delta(candidate, temporal_before, temporal_after)
         config = self.config
         raw = math.fsum(
@@ -184,7 +175,6 @@ class DiscountedWalkScorer:
         direct_was_active = candidate_pair in before.direct_pairs
 
         open_deltas: list[float] = []
-        closed_deltas: list[float] = []
         for pair in sorted(
             before.connectivity.keys() | after.connectivity.keys()
         ):
@@ -195,10 +185,7 @@ class DiscountedWalkScorer:
                 delta -= self._pair_value(1.0)
             if delta <= 0:
                 continue
-            if pair[0] == pair[1]:
-                closed_deltas.append(delta)
-            else:
-                open_deltas.append(delta)
+            open_deltas.append(delta)
 
         shortest_path_deltas: list[float] = []
         for pair, after_distance in after.shortest_distances.items():
@@ -207,37 +194,13 @@ class DiscountedWalkScorer:
             before_distance = before.shortest_distances.get(pair)
             if before_distance is None or after_distance >= before_distance:
                 continue
-            confidence = min(
-                before.shortest_confidences.get(pair, 1.0),
-                after.shortest_confidences.get(pair, 1.0),
-            )
-            completion_key = before.shortest_completion_keys.get(pair)
-            if completion_key is not None:
-                candidate_key = candidate.created_at, candidate.sequence
-                if completion_key >= candidate_key:
-                    # A late-arriving edge cannot retroactively shorten a route
-                    # that had not completed at the candidate's event time.
-                    confidence = 0.0
-                else:
-                    gap = max(
-                        0.0,
-                        (
-                            candidate.created_at - completion_key[0]
-                        ).total_seconds(),
-                    )
-                    confidence *= math.exp(
-                        -math.log(2.0)
-                        * gap
-                        / self.config.temporal_half_life_seconds
-                    )
             shortest_path_deltas.append(
-                ((1.0 / after_distance) - (1.0 / before_distance))
-                * confidence
+                (1.0 / after_distance) - (1.0 / before_distance)
             )
 
         open_delta = math.fsum(open_deltas)
         shortest_path_delta = math.fsum(shortest_path_deltas)
-        closed_delta = math.fsum(closed_deltas)
+        closed_delta = max(0.0, after.closed_value - before.closed_value)
         non_closed_delta = (
             open_delta + self.config.shortest_path_weight * shortest_path_delta
         )
@@ -254,52 +217,6 @@ class DiscountedWalkScorer:
             raw=raw,
             open_route_delta=non_closed_delta,
             closed_route_delta=closed_delta,
-        )
-
-    def _apply_long_return_floor(
-        self,
-        candidate: TemporalEdge,
-        relevant: tuple[TemporalEdge, ...],
-        before: _RouteState,
-        score: StructuralScore,
-    ) -> StructuralScore:
-        """Keep a real return visible when bounded route enumeration misses it.
-
-        Simple-route enumeration is deliberately bounded for predictable
-        streaming cost. Reachability itself is cheap, however, and a return
-        path must not become an ordinary extension merely because it is one
-        hop longer than that safety bound.
-        """
-
-        pair = candidate.sender, candidate.recipient
-        if pair in before.direct_pairs:
-            return score
-
-        adjacency = self._adjacency(relevant)
-        return_distance = self._shortest_distance(
-            candidate.recipient,
-            candidate.sender,
-            adjacency,
-        )
-        if return_distance is None:
-            return score
-
-        cycle_length = return_distance + 1
-        closed_floor = 1.0 / cycle_length
-        if score.closed_route_delta >= closed_floor:
-            return score
-
-        raw = max(
-            0.0,
-            score.raw
-            + self.config.closed_route_weight
-            * (closed_floor - score.closed_route_delta),
-        )
-        return StructuralScore(
-            risk=self._risk(raw),
-            raw=raw,
-            open_route_delta=score.open_route_delta,
-            closed_route_delta=closed_floor,
         )
 
     def _self_transfer_score(self) -> StructuralScore:

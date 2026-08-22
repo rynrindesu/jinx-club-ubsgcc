@@ -52,6 +52,9 @@ class CandidateRecoveryTests(unittest.TestCase):
 
         self.assertEqual(knowledge.observation_count, 2)
         self.assertEqual(knowledge.active_candidates, {1})
+        estimate = knowledge.estimate(1, 5)
+        self.assertEqual(estimate.confidence, "partial")
+        self.assertEqual(estimate.observation_count, 1)
 
     def test_decisive_scouting_resolves_the_inferred_legs(self):
         candidates = build_candidate_rules()

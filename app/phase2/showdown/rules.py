@@ -78,6 +78,7 @@ class RuleKnowledge:
     )
     _agreement_cache: float = field(init=False, default=0.0, repr=False)
     _candidate_exhausted: bool = field(init=False, default=False, repr=False)
+    _baseline_overridden: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self.active_candidates = set(range(len(self.candidates)))
@@ -186,10 +187,12 @@ class RuleKnowledge:
         pool = self._matching_candidates(live)
         if live and not pool:
             # Contradictory live showdowns are not safe to smooth away.
+            self._baseline_overridden = bool(baselines)
             return set()
 
         exact = self._matching_candidates(baselines, pool)
         if exact or not baselines:
+            self._baseline_overridden = False
             return exact
 
         # Baselines are scouting priors, not authority over a current
@@ -208,6 +211,7 @@ class RuleKnowledge:
             for index in pool
         }
         fewest = min(contradiction_counts.values())
+        self._baseline_overridden = True
         return {
             index
             for index, count in contradiction_counts.items()
@@ -266,11 +270,21 @@ class RuleKnowledge:
             )
             equities = [mean]
 
+        trusted_observations = (
+            [
+                observation
+                for observation in self.observations
+                if not observation.is_baseline
+            ]
+            if self._baseline_overridden
+            else self.observations
+        )
+        trusted_count = len(trusted_observations)
         confidence = "unknown"
-        if self.observation_count:
+        if trusted_count:
             confidence = "partial"
         distinct_communities = len(
-            {observation.community for observation in self.observations}
+            {observation.community for observation in trusted_observations}
         )
         disagreement = upper - lower
         locally_resolved = (
@@ -279,7 +293,7 @@ class RuleKnowledge:
             and disagreement <= 0.10
         )
         if (
-            self.observation_count >= 8
+            trusted_count >= 8
             and distinct_communities >= 4
             and self.active_candidates
             and (agreement >= 0.985 or locally_resolved)
@@ -293,7 +307,7 @@ class RuleKnowledge:
             disagreement=disagreement,
             coverage=coverage,
             candidate_count=len(self.active_candidates),
-            observation_count=self.observation_count,
+            observation_count=trusted_count,
             confidence=confidence,
         )
 
@@ -671,7 +685,7 @@ def _shared_winner_outcome(
     deltas, has_delta_data = _seat_values(
         hand,
         mapping_fields=("deltas", "chip_deltas"),
-        player_fields=("delta", "chip_delta", "net_delta"),
+        player_fields=("delta", "hand_delta", "net_delta"),
     )
     if has_delta_data:
         hero_delta = deltas.get(hero_key)

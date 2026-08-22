@@ -11,7 +11,7 @@ the number of opponents instead of enumerating 13**N joint hands.
 from __future__ import annotations
 
 import math
-from typing import Iterable, Mapping, Sequence
+from typing import Hashable, Iterable, Mapping, Sequence
 
 from .rules import (
     CARD_MAX,
@@ -94,6 +94,48 @@ def _share_from_outcomes(outcomes: Iterable[tuple[float, float]]) -> float:
         0.0,
         min(1.0, sum(probability / (tie_count + 1) for tie_count, probability in enumerate(dp))),
     )
+
+
+def _shares_for_all_masks(
+    outcomes: Sequence[tuple[float, float]],
+) -> tuple[float, ...]:
+    """Return exact shares for every subset of an ordered outcome sequence.
+
+    Each mask extends the already-computed DP for ``mask`` without its least
+    significant bit.  Thus every subset performs one opponent update instead
+    of rebuilding its tie distribution from scratch.
+    """
+
+    size = 1 << len(outcomes)
+    distributions: list[tuple[float, ...] | None] = [None] * size
+    shares = [0.0] * size
+    distributions[0] = (1.0,)
+    shares[0] = 1.0
+    for mask in range(1, size):
+        bit = mask & -mask
+        opponent_index = bit.bit_length() - 1
+        previous = distributions[mask ^ bit]
+        assert previous is not None
+        loses, ties = outcomes[opponent_index]
+        loses = max(0.0, min(1.0, loses))
+        ties = max(0.0, min(1.0 - loses, ties))
+        updated = [0.0] * (len(previous) + 1)
+        for tie_count, probability in enumerate(previous):
+            updated[tie_count] += probability * loses
+            updated[tie_count + 1] += probability * ties
+        distribution = tuple(updated)
+        distributions[mask] = distribution
+        shares[mask] = max(
+            0.0,
+            min(
+                1.0,
+                sum(
+                    probability / (tie_count + 1)
+                    for tie_count, probability in enumerate(distribution)
+                ),
+            ),
+        )
+    return tuple(shares)
 
 
 def exact_share_for_hypothesis(
@@ -212,6 +254,130 @@ def _revealed_showdown_share(
     return (1.0 - fallback_weight) * formula_share + fallback_weight * empirical_share
 
 
+def showdown_shares_by_subset(
+    hero_number: int,
+    community: int | None,
+    opponent_ranges_by_key: Mapping[Hashable, RangeInput | None],
+    rule_model: RuleModel,
+) -> dict[frozenset[Hashable], float]:
+    """Return equity against every subset of up to five named opponents.
+
+    Ranges, ranks, and per-opponent outcomes are computed once.  Formula shares
+    and the empirical fallback then reuse one dynamic-program transition per
+    subset.  The returned mapping contains all ``2**N`` subsets, including the
+    empty subset with a share of exactly ``1.0``.
+    """
+
+    hero_number = _validated_card(hero_number, "hero number")
+    if not isinstance(rule_model, RuleModel):
+        raise TypeError("rule_model must be a RuleModel")
+    if not isinstance(opponent_ranges_by_key, Mapping):
+        raise TypeError("opponent_ranges_by_key must be a mapping")
+
+    keys = tuple(opponent_ranges_by_key)
+    if len(keys) > 5:
+        raise ValueError("subset equity supports at most five opponents")
+    normalized = tuple(
+        normalize_range(opponent_ranges_by_key[key]) for key in keys
+    )
+    subset_count = 1 << len(keys)
+    subset_keys = tuple(
+        frozenset(keys[index] for index in range(len(keys)) if mask & (1 << index))
+        for mask in range(subset_count)
+    )
+
+    if community is None:
+        communities = tuple(range(CARD_MIN, CARD_MAX + 1))
+    else:
+        communities = (_validated_card(community, "community"),)
+
+    posterior_entries = [
+        (weight, HYPOTHESIS_BY_NAME[name])
+        for name, weight in rule_model.posterior().items()
+        if name in HYPOTHESIS_BY_NAME and weight > 0.0
+    ]
+    posterior_total = sum(weight for weight, _hypothesis in posterior_entries)
+    if posterior_total > 0.0:
+        posterior_entries = [
+            (weight / posterior_total, hypothesis)
+            for weight, hypothesis in posterior_entries
+        ]
+
+    totals = [0.0] * subset_count
+    for revealed in communities:
+        formula_shares = [0.0] * subset_count
+        ranked_hypotheses: list[
+            tuple[float, tuple[int | float, ...], tuple[tuple[int | float, ...], ...]]
+        ] = []
+
+        for posterior_weight, hypothesis in posterior_entries:
+            ranks = tuple(
+                hypothesis.rank(number, revealed)
+                for number in range(CARD_MIN, CARD_MAX + 1)
+            )
+            hero_rank = ranks[hero_number - CARD_MIN]
+            ranked_hypotheses.append((posterior_weight, hero_rank, ranks))
+
+            outcomes: list[tuple[float, float]] = []
+            for probabilities in normalized:
+                loses_to_hero = 0.0
+                ties_hero = 0.0
+                for probability, opponent_rank in zip(probabilities, ranks):
+                    if hero_rank > opponent_rank:
+                        loses_to_hero += probability
+                    elif hero_rank == opponent_rank:
+                        ties_hero += probability
+                outcomes.append((loses_to_hero, ties_hero))
+            hypothesis_shares = _shares_for_all_masks(outcomes)
+            for mask, share in enumerate(hypothesis_shares):
+                formula_shares[mask] += posterior_weight * share
+
+        fallback_weight = rule_model.fallback_weight(revealed)
+        if fallback_weight > 0.0:
+            fallback_outcomes: list[tuple[float, float]] = []
+            for probabilities in normalized:
+                loses_to_hero = 0.0
+                ties_hero = 0.0
+                for offset, range_probability in enumerate(probabilities):
+                    opponent_number = offset + CARD_MIN
+                    tie_probability = sum(
+                        posterior_weight
+                        for posterior_weight, hero_rank, ranks in ranked_hypotheses
+                        if hero_rank == ranks[offset]
+                    )
+                    comparison = rule_model.empirical_comparison_probability(
+                        hero_number,
+                        opponent_number,
+                        revealed,
+                        default=0.5,
+                    )
+                    win_probability = comparison - 0.5 * tie_probability
+                    win_probability = max(
+                        0.0, min(1.0 - tie_probability, win_probability)
+                    )
+                    loses_to_hero += range_probability * win_probability
+                    ties_hero += range_probability * tie_probability
+                fallback_outcomes.append((loses_to_hero, ties_hero))
+            fallback_shares = _shares_for_all_masks(fallback_outcomes)
+            for mask in range(subset_count):
+                totals[mask] += (
+                    (1.0 - fallback_weight) * formula_shares[mask]
+                    + fallback_weight * fallback_shares[mask]
+                )
+        else:
+            for mask in range(subset_count):
+                totals[mask] += formula_shares[mask]
+
+    divisor = float(len(communities))
+    result = {
+        subset_keys[mask]: totals[mask] / divisor for mask in range(subset_count)
+    }
+    # Preserve the exact mathematical identity rather than a nearly-one float
+    # accumulated through posterior/community mixtures.
+    result[frozenset()] = 1.0
+    return result
+
+
 def showdown_share(
     hero_number: int,
     community: int | None,
@@ -242,4 +408,5 @@ __all__ = [
     "exact_share_for_hypothesis",
     "normalize_range",
     "showdown_share",
+    "showdown_shares_by_subset",
 ]

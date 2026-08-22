@@ -333,24 +333,13 @@ class RuleInferenceTests(unittest.TestCase):
     def test_scouted_attempt_seeds_the_fixed_leg_rules_once(self):
         state = Phase2State()
         expected = {
-            1: (11, {"higher", "pair_then_higher"}),
+            1: (12, {"pair_then_higher"}),
             2: (
                 9,
                 {"higher", "pair_then_higher", "pair_loses_then_higher"},
             ),
-            3: (
-                14,
-                {"higher", "pair_then_higher", "pair_loses_then_higher"},
-            ),
-            4: (
-                7,
-                {
-                    "lower",
-                    "pair_then_lower",
-                    "pair_loses_then_lower",
-                    "fibonacci_first_lower",
-                },
-            ),
+            3: (16, {"pair_then_seven_then_higher"}),
+            4: (8, {"pair_loses_then_lower"}),
         }
 
         for leg_number, (count, candidate_names) in expected.items():
@@ -1043,9 +1032,13 @@ class Phase2PolicyTests(unittest.TestCase):
             return request
 
         self.assertEqual(engine.decide(raised_post(4, 12)), {"action": "fold"})
-        self.assertEqual(engine.decide(raised_post(3, 10)), {"action": "call"})
+        self.assertEqual(engine.decide(raised_post(3, 10)), {"action": "fold"})
+        self.assertEqual(
+            engine.decide(raised_post(1, 10)),
+            {"action": "raise", "amount": 46},
+        )
 
-    def test_early_thirty_chip_result_stays_active_but_late_cushion_protects(self):
+    def test_strong_reraise_range_overrides_an_early_chip_cushion(self):
         state = Phase2State()
         teach_candidate(state, "protected-low-rule", "lower")
         engine = Phase2Engine(state)
@@ -1091,7 +1084,7 @@ class Phase2PolicyTests(unittest.TestCase):
             chip_delta=-33, stack=212, bet_this_round=21
         )
 
-        self.assertEqual(engine.decide(request), {"action": "call"})
+        self.assertEqual(engine.decide(request), {"action": "fold"})
 
         late = copy.deepcopy(request)
         late["hand_number"] = 30
@@ -1247,7 +1240,7 @@ class StateScopeTests(unittest.TestCase):
         _, retry_profile = state.observe_payload(retry)
         self.assertEqual(retry_profile.open_responses, 0)
 
-    def test_revealed_actions_condition_range_after_six_shown_hands(self):
+    def test_revealed_actions_condition_range_from_the_first_shown_hand(self):
         state = Phase2State()
         knowledge = teach_candidate(state, "behavior-rule", "lower")
         hands = []
@@ -1301,7 +1294,14 @@ class StateScopeTests(unittest.TestCase):
             payload=request,
             rule_knowledge=knowledge,
         )
-        self.assertTrue(all(abs(weight - 1 / 13) < 1e-12 for weight in early_range))
+        uniform_equity = knowledge.estimate(4, None).mean
+        early_equity = knowledge.estimate(
+            4,
+            None,
+            opponent_range=early_range,
+        ).mean
+        self.assertGreater(early_range[0], early_range[-1])
+        self.assertLess(early_equity, uniform_equity)
 
         request["recent_hands"] = hands
         _, learned_profile = state.observe_payload(request)
@@ -1309,7 +1309,6 @@ class StateScopeTests(unittest.TestCase):
             payload=request,
             rule_knowledge=knowledge,
         )
-        uniform_equity = knowledge.estimate(4, None).mean
         conditioned_equity = knowledge.estimate(
             4,
             None,
@@ -1319,6 +1318,7 @@ class StateScopeTests(unittest.TestCase):
         self.assertAlmostEqual(sum(opponent_range), 1.0)
         self.assertGreater(opponent_range[0], 2 * opponent_range[-1])
         self.assertLess(conditioned_equity, uniform_equity - 0.15)
+        self.assertLessEqual(conditioned_equity, early_equity)
 
     def test_three_bet_response_is_not_counted_as_fold_to_open(self):
         state = Phase2State()
