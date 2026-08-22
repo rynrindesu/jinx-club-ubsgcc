@@ -60,6 +60,47 @@ class ApiTests(unittest.TestCase):
             ]],
         )
 
+    def test_stonks_endpoint_uses_reinvestment_optimizer(self):
+        response = self.client.post(
+            "/stonks",
+            json=[
+                {
+                    "energy": 5,
+                    "capital": 10,
+                    "timeline": {
+                        "2037": {
+                            "A": {"price": 11, "qty": 0},
+                            "B": {"price": 12, "qty": 0},
+                        },
+                        "2036": {
+                            "A": {"price": 2, "qty": 2},
+                            "B": {"price": 1, "qty": 2},
+                        },
+                        "2035": {
+                            "A": {"price": 9, "qty": 0},
+                            "B": {"price": 6, "qty": 2},
+                        },
+                    },
+                }
+            ],
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            [[
+                "j-2037-2036",
+                "b-A-2",
+                "b-B-2",
+                "j-2036-2035",
+                "s-A-1",
+                "b-B-2",
+                "j-2035-2037",
+                "s-A-1",
+                "s-B-4",
+            ]],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

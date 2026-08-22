@@ -22,7 +22,7 @@ from .phase3.ghost_chains import (
     reset as reset_phase_three_ghost_chains,
     score_batch as score_phase_three_ghost_chains_batch,
 )
-from .phase04.stonkers import solve_cases as solve_stonks_cases
+from .phase04.stonks import solve_cases as solve_stonks_cases
 from .showdown import decide_move
 from .phase3.toolbox.server import mcp
 

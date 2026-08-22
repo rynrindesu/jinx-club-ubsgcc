@@ -650,6 +650,7 @@ def _simulate_sweep(
     prices: dict[int, dict[str, int]],
     sale_policy: str,
     buy_policy: str,
+    gate_policy: str,
     target_cache: dict[tuple[str, int, int], tuple[int, int] | None],
 ) -> tuple[int, list[str]]:
     listings_by_year: dict[int, list[tuple[int, _Listing]]] = {}
@@ -707,6 +708,41 @@ def _simulate_sweep(
             )
             if quantity <= 0:
                 continue
+
+            if gate_policy != "any" and quantity < listing.qty:
+                has_later_chance = False
+                for future_index in range(route_index + 1, len(route)):
+                    if route[future_index] != listing.year:
+                        continue
+                    cache_key = (sale_policy, future_index, listing_index)
+                    if cache_key not in target_cache:
+                        target_cache[cache_key] = _future_sale(
+                            route,
+                            future_index,
+                            listing,
+                            prices,
+                            sale_policy,
+                        )
+                    if target_cache[cache_key] is not None:
+                        has_later_chance = True
+                        break
+
+                required_numerator = {
+                    "wait_quarter": 4,
+                    "wait_half": 2,
+                    "wait_full": 1,
+                    "full": 1,
+                }.get(gate_policy, 0)
+                below_threshold = (
+                    quantity * required_numerator < listing.qty
+                    if required_numerator > 1
+                    else quantity < listing.qty
+                )
+                if below_threshold and (
+                    gate_policy == "full" or has_later_chance
+                ):
+                    continue
+
             cash -= quantity * listing.price
             used_lots.add(listing_index)
             actions.append(f"b-{listing.stock}-{quantity}")
@@ -753,30 +789,39 @@ def _best_sweep(
             "knapsack",
         )
     )
+    gate_policies = (
+        ("any", "wait_full")
+        if len(listings) > 250
+        else ("any", "wait_full", "wait_half")
+        if len(listings) > 80
+        else ("any", "wait_full", "wait_half", "wait_quarter", "full")
+    )
     for route in routes:
         target_cache: dict[
             tuple[str, int, int], tuple[int, int] | None
         ] = {}
         for sale_policy in sale_policies:
             for buy_policy in buy_policies:
-                cash, actions = _simulate_sweep(
-                    route,
-                    capital,
-                    listings,
-                    prices,
-                    sale_policy,
-                    buy_policy,
-                    target_cache,
-                )
-                if cash > best_cash or (
-                    cash == best_cash and len(actions) < len(best_actions)
-                ):
-                    best_cash = cash
-                    best_actions = actions
+                for gate_policy in gate_policies:
+                    cash, actions = _simulate_sweep(
+                        route,
+                        capital,
+                        listings,
+                        prices,
+                        sale_policy,
+                        buy_policy,
+                        gate_policy,
+                        target_cache,
+                    )
+                    if cash > best_cash or (
+                        cash == best_cash and len(actions) < len(best_actions)
+                    ):
+                        best_cash = cash
+                        best_actions = actions
     return best_cash, best_actions
 
 
-def solve_case(case: dict[str, Any]) -> list[str]:
+def _solve_case_primary(case: dict[str, Any]) -> list[str]:
     """Return a profitable, energy-safe action sequence for one test case."""
 
     energy, capital, listings, prices = _parse_case(case)
@@ -844,6 +889,117 @@ def solve_case(case: dict[str, Any]) -> list[str]:
     if best.cash <= capital:
         return []
     return actions
+
+
+def _score_actions(case: dict[str, Any], actions: list[str]) -> int | None:
+    """Return final cash for a legal plan, or ``None`` if it is invalid."""
+
+    timeline = {
+        int(raw_year): {
+            str(stock): (int(quote["price"]), int(quote["qty"]))
+            for stock, quote in raw_stocks.items()
+        }
+        for raw_year, raw_stocks in case["timeline"].items()
+    }
+    cash = int(case["capital"])
+    energy_left = int(case["energy"])
+    year = PRESENT_YEAR
+    holdings: dict[str, int] = {}
+    bought_lots: set[tuple[int, str]] = set()
+
+    for action in actions:
+        if not isinstance(action, str) or len(action) < 3 or action[1] != "-":
+            return None
+        kind = action[0]
+        rest = action[2:]
+        if kind == "j":
+            parts = rest.split("-")
+            if len(parts) != 2:
+                return None
+            try:
+                source, destination = map(int, parts)
+            except ValueError:
+                return None
+            cost = abs(destination - source)
+            if (
+                source != year
+                or destination <= 0
+                or destination > PRESENT_YEAR
+                or cost > energy_left
+            ):
+                return None
+            energy_left -= cost
+            year = destination
+            continue
+
+        if kind not in {"b", "s"} or "-" not in rest:
+            return None
+        stock, raw_quantity = rest.rsplit("-", 1)
+        try:
+            quantity = int(raw_quantity)
+        except ValueError:
+            return None
+        quote = timeline.get(year, {}).get(stock)
+        if quote is None or quantity <= 0:
+            return None
+        price, available = quote
+
+        if kind == "b":
+            lot = (year, stock)
+            cost = price * quantity
+            if lot in bought_lots or quantity > available or cost > cash:
+                return None
+            bought_lots.add(lot)
+            cash -= cost
+            holdings[stock] = holdings.get(stock, 0) + quantity
+        else:
+            if holdings.get(stock, 0) < quantity:
+                return None
+            holdings[stock] -= quantity
+            cash += price * quantity
+
+    if year != PRESENT_YEAR or any(holdings.values()):
+        return None
+    return cash
+
+
+def solve_case(case: dict[str, Any]) -> list[str]:
+    """Run exact and complementary planners, returning their best legal plan."""
+
+    # Compact adversarial cases are finite enough to solve globally, including
+    # partial sales and concurrent holdings that route heuristics can miss.
+    try:
+        from .stonks_exact import solve_case as solve_exact_case
+
+        exact_actions = solve_exact_case(case)
+    except (KeyError, TypeError, ValueError):
+        exact_actions = None
+    if exact_actions is not None and _score_actions(case, exact_actions) is not None:
+        return exact_actions
+
+    candidates = [_solve_case_primary(case)]
+    _, capital, listings, _ = _parse_case(case)
+
+    # The independent one-sweep bounded-knapsack planner is occasionally
+    # stronger when reserving the initial capital across many outbound lots.
+    binary_blocks = sum(listing.qty.bit_length() for listing in listings)
+    if capital <= 20_000 and len(listings) <= 80 and binary_blocks <= 180:
+        from .stonkers import solve_case as solve_knapsack_sweep
+
+        candidates.append(solve_knapsack_sweep(case))
+
+    best_actions: list[str] = []
+    best_cash = capital
+    for actions in candidates:
+        final_cash = _score_actions(case, actions)
+        if final_cash is None:
+            continue
+        if final_cash > best_cash or (
+            final_cash == best_cash and len(actions) < len(best_actions)
+        ):
+            best_cash = final_cash
+            best_actions = actions
+    return best_actions
 
 
 def solve_cases(cases: list[dict[str, Any]]) -> list[list[str]]:

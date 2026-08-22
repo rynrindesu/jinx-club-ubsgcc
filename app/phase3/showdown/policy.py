@@ -182,6 +182,27 @@ class HighVariancePolicy:
                     < cumulative_limit
                 ]
 
+            # Before the community is known, no private number is reliably
+            # protected across these pair/distance rules.  Raise wars in the
+            # latest replay turned modeled "strong" eights into calls of
+            # 119/198 chips.  Keep the quarter-stack cap absolute pre-reveal;
+            # genuine late desperation is handled by the outer exception.
+            if request.round == "pre_reveal":
+                cumulative_limit = 0.25 * request.starting_stack
+                candidates = [
+                    candidate
+                    for candidate in candidates
+                    if not (
+                        candidate.action == "call"
+                        and current_commitment + call_cost >= cumulative_limit
+                    )
+                    and not (
+                        candidate.action in {"bet", "raise"}
+                        and current_commitment + self._hero_extra(request, candidate)
+                        >= cumulative_limit
+                    )
+                ]
+
         # These opponents almost never fold after the reveal.  Post-reveal air
         # therefore checks rather than paying for a bluff that will be raised.
         if (
