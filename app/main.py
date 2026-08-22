@@ -1,10 +1,10 @@
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from .phase2.adaptive.solution import solve
+from .phase2.adaptive.solution import PayloadValidationError, solve
 from .phase1.kanchiong_delivery_driver.solution import solve_case
 from .showdown import decide_move
 from .phase1.toolbox.server import mcp
@@ -28,7 +28,10 @@ class SolveRequest(BaseModel):
 
 @app.post("/solve")
 def solve_endpoint(request: SolveRequest):
-    return solve(request.payload)
+    try:
+        return solve(request.payload)
+    except PayloadValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.get("/health")
