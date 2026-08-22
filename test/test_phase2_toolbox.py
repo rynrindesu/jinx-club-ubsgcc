@@ -131,5 +131,5 @@ class McpDiscoveryTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('"name":"find_study_passages"', response.text)
+        self.assertIn('"name":"retrieve"', response.text)
         self.assertIn('"name":"next_route_node"', response.text)

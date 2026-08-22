@@ -20,7 +20,7 @@ def register_tools(mcp: FastMCP) -> None:
     """Register the Phase 2 tools alongside the original Tool-box tools."""
 
     @mcp.tool(
-        name="find_study_passages",
+        name="retrieve",
         description=(
             "Return the most relevant passages from the assigned study materials "
             "for a question. Passages, not an answer, are returned and their total "
@@ -28,8 +28,8 @@ def register_tools(mcp: FastMCP) -> None:
             "these passages first to identify the destination before navigating."
         ),
     )
-    def find_study_passages(question: str) -> list[str]:
-        return study_passages(question, _study_materials_url())
+    def retrieve(query: str) -> list[str]:
+        return study_passages(query, _study_materials_url())
 
     @mcp.tool(
         name="next_route_node",
