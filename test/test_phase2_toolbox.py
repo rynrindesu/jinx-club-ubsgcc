@@ -148,6 +148,24 @@ class StudySelectionTests(unittest.TestCase):
         self.assertNotIn("6 April", passages[0])
         self.assertLessEqual(len(passages[0]), 220)
 
+    def test_combines_the_top_three_non_overlapping_spans(self):
+        documents = (
+            StudyDocument("Archives", "https://example.test/archives", "The archives are stored in North Hall."),
+            StudyDocument("Ledgers", "https://example.test/ledgers", "The ledgers are stored in East Hall."),
+            StudyDocument("Blueprints", "https://example.test/blueprints", "The blueprints are stored in West Hall."),
+        )
+
+        passages = select_passages(
+            "Where are the archives, ledgers, and blueprints stored?",
+            documents,
+            CharacterEncoder(),
+        )
+
+        self.assertEqual(len(passages), 3)
+        self.assertTrue(any("North Hall" in passage for passage in passages))
+        self.assertTrue(any("East Hall" in passage for passage in passages))
+        self.assertTrue(any("West Hall" in passage for passage in passages))
+
 
 class McpDiscoveryTests(unittest.TestCase):
     def test_advertises_the_phase2_tools(self):

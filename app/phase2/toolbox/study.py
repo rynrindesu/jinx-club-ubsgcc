@@ -14,7 +14,9 @@ import httpx
 
 
 TOKEN_BUDGET = 900
-MAX_PASSAGES = 2
+# Three non-overlapping answer-focused spans provide corroborating evidence
+# while remaining under the challenge's 900-token total limit.
+MAX_PASSAGES = 3
 MAX_PASSAGE_TOKENS = 220
 MAX_WINDOW_SENTENCES = 3
 _STOP_WORDS = frozenset(
