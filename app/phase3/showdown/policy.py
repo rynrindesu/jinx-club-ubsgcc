@@ -123,17 +123,7 @@ class HighVariancePolicy:
             and action.action in {"bet", "raise"}
             for action in request.current_hand_actions
         )
-        leader = max(
-            (
-                player.chip_delta
-                for player in request.players
-                if player.seat != request.your_seat
-            ),
-            default=0,
-        )
-        desperate = remaining_hands < self.config.endgame_hands and (
-            request.own_player.chip_delta < max(10, leader + 1)
-        )
+        desperate = self._is_desperate(request, remaining_hands)
 
         # Never let attractive pot odds turn a middling multiway hand into an
         # uncontrolled stack call.  The second replay's remaining catastrophic
@@ -149,10 +139,18 @@ class HighVariancePolicy:
                 1, request.starting_stack
             )
             pot_odds = call_cost / max(1, request.pot + call_cost)
+            low_loss_edge = (
+                base_metrics.expected_share >= pot_odds + 0.04
+                and base_metrics.loss_probability <= 0.12
+            )
+            unbeatable_edge = (
+                base_metrics.expected_share >= pot_odds + 0.02
+                and base_metrics.loss_probability <= 0.01
+            )
             call_is_robust = (
                 base_metrics.expected_share >= max(0.58, pot_odds + 0.10)
                 and base_metrics.sole_win_probability >= 0.45
-            )
+            ) or low_loss_edge
             # Repeated individually-small calls were still able to commit most
             # of a stack (189 chips before the reveal in the third replay).
             # Once a hand crosses a quarter of the starting stack, require a
@@ -161,11 +159,11 @@ class HighVariancePolicy:
             cumulative_call_is_robust = (
                 base_metrics.expected_share >= max(0.70, pot_odds + 0.10)
                 and base_metrics.sole_win_probability >= 0.62
-            )
+            ) or low_loss_edge
             all_in_is_robust = (
                 base_metrics.expected_share >= max(0.72, pot_odds + 0.12)
                 and base_metrics.sole_win_probability >= 0.72
-            )
+            ) or unbeatable_edge
             if (exposure >= 0.25 and not call_is_robust) or (
                 cumulative_exposure >= 0.25 and not cumulative_call_is_robust
             ) or (
@@ -184,6 +182,37 @@ class HighVariancePolicy:
                     < cumulative_limit
                 ]
 
+        # These opponents almost never fold after the reveal.  Post-reveal air
+        # therefore checks rather than paying for a bluff that will be raised.
+        if (
+            request.round == "post_reveal"
+            and not desperate
+            and base_metrics.expected_share < 0.50
+            and base_metrics.sole_win_probability < 0.40
+        ):
+            candidates = [
+                candidate
+                for candidate in candidates
+                if candidate.action not in {"bet", "raise"}
+            ]
+
+        # After calling a pre-reveal re-raise, the replayed opponents almost
+        # always continued or raised a post-reveal lead.  Check to the prior
+        # aggressor unless this is an actual nut/value hand; the call candidate
+        # remains available when they bet.
+        if (
+            request.round == "post_reveal"
+            and not desperate
+            and self._called_pre_reveal_reraise(request)
+            and base_metrics.loss_probability > 0.01
+            and base_metrics.sole_win_probability < 0.80
+        ):
+            candidates = [
+                candidate
+                for candidate in candidates
+                if candidate.action not in {"bet", "raise"}
+            ]
+
         # Avoid the repeated bet/re-raise/fold leak: make at most one voluntary
         # wager per street unless the showdown is exceptionally strong or the
         # exact late-leg target requires the extra variance.
@@ -193,7 +222,7 @@ class HighVariancePolicy:
             ]
             if request.to_call:
                 pot_odds = request.to_call / max(1, request.pot + request.to_call)
-                if base_metrics.expected_share < max(0.60, pot_odds + 0.08):
+                if base_metrics.expected_share < pot_odds + 0.04:
                     candidates = [
                         candidate for candidate in candidates if candidate.action != "call"
                     ]
@@ -203,7 +232,10 @@ class HighVariancePolicy:
         # without turning every leg into the observed -200/+1000 coin flip.
         if not desperate and not (
             confidence >= self.config.scout_confidence
-            and base_metrics.sole_win_probability >= 0.80
+            and (
+                base_metrics.sole_win_probability >= 0.80
+                or base_metrics.loss_probability <= 0.01
+            )
         ):
             candidates = [
                 candidate
@@ -441,13 +473,7 @@ class HighVariancePolicy:
 
         # Multiway air is a poor bluff.  Keep the high-variance exception for a
         # late deficit, when passivity cannot meet the terminal predicate.
-        leader = max(
-            (player.chip_delta for player in request.players if player.seat != request.your_seat),
-            default=0,
-        )
-        desperate = remaining_hands < self.config.endgame_hands and (
-            request.own_player.chip_delta < max(10, leader + 1)
-        )
+        desperate = self._is_desperate(request, remaining_hands)
         if base_equity < 0.20 and len(responders) > 2 and not desperate:
             total -= 80.0 * (1.0 + size_ratio)
         return total
@@ -712,7 +738,18 @@ class HighVariancePolicy:
     ) -> None:
         if not opponents:
             return
-        winner = max(opponents, key=lambda player: (player.chip_delta, -player.seat))
+        # chip_delta is frozen at hand start; the rollout deltas include current
+        # commitments and therefore identify the actual live leader.
+        winner = max(
+            opponents,
+            key=lambda player: (
+                deltas.get(
+                    player.seat,
+                    player.stack - request.starting_stack,
+                ),
+                -player.seat,
+            ),
+        )
         deltas[winner.seat] += pot
 
     def _opponent_range(
@@ -874,6 +911,40 @@ class HighVariancePolicy:
                 if action.seat == request.your_seat and action.action == "call":
                     total += max(0, (action.amount or before) - before)
         return total
+
+    @staticmethod
+    def _called_pre_reveal_reraise(request: Any) -> bool:
+        hero_committed = False
+        opponent_raised_after_commitment = False
+        for action in request.current_hand_actions:
+            if action.round != "pre_reveal":
+                continue
+            if action.seat == request.your_seat:
+                if action.action == "call" and opponent_raised_after_commitment:
+                    return True
+                if action.action in {"call", "bet", "raise"}:
+                    hero_committed = True
+            elif hero_committed and action.action == "raise":
+                opponent_raised_after_commitment = True
+        return False
+
+    @staticmethod
+    def _is_desperate(request: Any, remaining_hands: int) -> bool:
+        """Require genuine closing pressure before disabling safety gates."""
+
+        leader = max(
+            (
+                player.chip_delta
+                for player in request.players
+                if player.seat != request.your_seat
+            ),
+            default=0,
+        )
+        gap = max(10, leader + 1) - request.own_player.chip_delta
+        return gap > 0 and (
+            remaining_hands <= 3
+            or gap > max(25, 4 * max(0, remaining_hands))
+        )
 
     @staticmethod
     def _passive_is_safe(request: Any, action: str) -> bool:

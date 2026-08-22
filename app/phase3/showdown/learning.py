@@ -332,7 +332,11 @@ class OpponentProfile:
         )
         for backoff_level, dimensions in enumerate(levels):
             counts, total = self._aggregate(query, dimensions)
-            if total > 0.0:
+            # Exact action/position/strength buckets are extremely sparse in a
+            # four-leg replay.  Back off instead of treating one observation as
+            # a personality; broad facing-only/global levels remain available.
+            minimum_support = 4.0 if backoff_level < 4 else 1.0
+            if total >= minimum_support:
                 return counts, total, backoff_level
         return {}, 0.0, len(levels)
 

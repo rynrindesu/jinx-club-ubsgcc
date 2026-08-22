@@ -471,7 +471,14 @@ class RuleModel:
         coverage = 1.0 - math.exp(-evidence / 18.0)
         average_fit = self._fit_sum / self._observations if self._observations else 0.0
         mismatch = 1.0 - min(1.0, average_fit / 0.86)
-        return min(0.9, coverage * (0.20 + 0.72 * mismatch))
+        # The graph is a misspecification backstop, not permanent noise.  Once
+        # a formula explains the observations with high confidence, do not let
+        # sparse empirical edges invent impossible losses under that formula.
+        confidence_gap = 1.0 - self.confidence()
+        return min(
+            0.9,
+            coverage * (0.20 * confidence_gap + 0.72 * mismatch),
+        )
 
     def comparison_probability(self, a: int, b: int, community: int) -> float:
         """Posterior/fallback blend for P(a wins), counting a tie as one half."""
@@ -486,7 +493,13 @@ class RuleModel:
             a, b, community, default=model
         )
         local_weight = 1.0 - math.exp(-direct / 4.0)
-        weight = max(self.fallback_weight(community), 0.88 * local_weight)
+        average_fit = self._fit_sum / self._observations if self._observations else 0.0
+        mismatch = 1.0 - min(1.0, average_fit / 0.86)
+        empirical_need = max(mismatch, 1.0 - self.confidence())
+        weight = max(
+            self.fallback_weight(community),
+            0.88 * local_weight * empirical_need,
+        )
         weight = min(0.92, weight)
         return (1.0 - weight) * model + weight * empirical
 

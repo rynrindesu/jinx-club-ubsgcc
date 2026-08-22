@@ -415,7 +415,20 @@ class Phase2PolicyRegressionTests(unittest.TestCase):
         self.assertEqual(
             _post_reveal_move(
                 request,
-                learned_equity(0.71),
+                learned_equity(0.701),
+                replace(
+                    neutral_profile(),
+                    aggression_rate=0.25,
+                    decisions=20,
+                ),
+                risk,
+            ),
+            {"action": "call"},
+        )
+        self.assertEqual(
+            _post_reveal_move(
+                request,
+                learned_equity(0.699),
                 neutral_profile(),
                 risk,
             ),

@@ -318,7 +318,7 @@ def _post_reveal_move(
                 # Once the rule is exactly identified, take a favorable
                 # closing price with a strong hand.  Keep the stricter floor
                 # for expensive calls, protected leads, and raise wars.
-                reopen_floor = 0.72
+                reopen_floor = 0.70
             required = max(
                 required,
                 reopen_floor,
