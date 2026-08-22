@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.phase3.toolbox import server as toolbox_server
 from app.phase3.toolbox.meetings import find_meeting_window, own_calendar_blocks
+from app.phase3.toolbox.locations import best_meeting_point
 from app.phase3.toolbox.venues import open_venue_names, validate_hour
 
 
@@ -110,6 +111,23 @@ When: Tuesday 13:00-14:00
         self.assertEqual([(block.start, block.end) for block in soft], [(780, 840)])
 
 
+class MeetingPointTests(unittest.TestCase):
+    def test_uses_coordinate_wise_medians_and_includes_the_android(self):
+        self.assertEqual(
+            best_meeting_point(
+                [0, 3],
+                [{"person": "cira", "x": 8, "y": 1}, {"person": "iris", "x": 4, "y": 7}],
+            ),
+            [4, 3],
+        )
+
+    def test_uses_a_deterministic_valid_point_when_medians_are_an_interval(self):
+        self.assertEqual(
+            best_meeting_point([0, 0], [{"x": 8, "y": 8}]),
+            [0, 0],
+        )
+
+
 class McpDiscoveryTests(unittest.TestCase):
     def test_advertises_the_phase3_tool(self):
         initialize = {
@@ -141,3 +159,4 @@ class McpDiscoveryTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('"name":"find_open_venues"', response.text)
         self.assertIn('"name":"find_meeting_time"', response.text)
+        self.assertIn('"name":"find_meeting_point"', response.text)

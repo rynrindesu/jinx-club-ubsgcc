@@ -12,6 +12,7 @@ from fastmcp import FastMCP
 
 from .venues import normalise_day, open_venue_names, validate_hour
 from .meetings import find_meeting_window
+from .locations import best_meeting_point
 
 
 DEFAULT_CHALLENGE_URL = "https://tool-box-2591eaa24fa3.herokuapp.com"
@@ -66,6 +67,25 @@ def register_tools(mcp: FastMCP) -> None:
             schedules,
         )
 
+    @mcp.tool(
+        name="find_meeting_point",
+        description=(
+            "Return the [x, y] grid cell that minimizes total Manhattan travel for "
+            "the android and every named friend on a weekday. Supply the android's "
+            "starting [x, y] position and every friend's name. All travellers count."
+        ),
+    )
+    def find_meeting_point(
+        day: str, people: list[str], own_location: list[int]
+    ) -> list[int]:
+        canonical_day = normalise_day(day)
+        if not people:
+            raise ValueError("at least one friend is required")
+        if len(set(people)) != len(people):
+            raise ValueError("each friend must be listed only once")
+        locations = [_fetch_location(person, canonical_day) for person in people]
+        return best_meeting_point(own_location, locations)
+
 
 def _venues_url() -> str:
     base_url = os.getenv("TOOLBOX_CHALLENGE_URL", DEFAULT_CHALLENGE_URL).rstrip("/")
@@ -98,6 +118,11 @@ def _inbox_url() -> str:
 def _schedule_url() -> str:
     base_url = os.getenv("TOOLBOX_CHALLENGE_URL", DEFAULT_CHALLENGE_URL).rstrip("/")
     return os.getenv("TOOLBOX_SCHEDULE_URL", f"{base_url}/schedule")
+
+
+def _location_url() -> str:
+    base_url = os.getenv("TOOLBOX_CHALLENGE_URL", DEFAULT_CHALLENGE_URL).rstrip("/")
+    return os.getenv("TOOLBOX_LOCATION_URL", f"{base_url}/location")
 
 
 def _fetch_inbox() -> str:
@@ -141,4 +166,19 @@ def _fetch_schedule(person: str, day: str) -> dict[str, Any]:
     payload = response.json()
     if not isinstance(payload, dict):
         raise ValueError("schedule response must be an object")
+    return payload
+
+
+def _fetch_location(person: str, day: str) -> dict[str, Any]:
+    if not isinstance(person, str) or not person.strip():
+        raise ValueError("each person must be a non-empty string")
+    response = httpx.get(
+        f"{_location_url().rstrip('/')}/{quote(person.strip(), safe='')}/{day}",
+        timeout=15.0,
+        follow_redirects=True,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError("location response must be an object")
     return payload
