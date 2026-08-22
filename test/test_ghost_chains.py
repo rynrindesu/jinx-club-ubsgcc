@@ -351,7 +351,7 @@ class StructuralScoringTests(unittest.TestCase):
 
 
 class TemporalStateTests(unittest.TestCase):
-    def test_twenty_four_hour_window_expires_the_exact_boundary(self):
+    def test_twenty_four_hour_window_includes_the_exact_boundary(self):
         inside = GhostChainsEngine()
         inside.score_transaction(transaction("inside-1", "A", "B"))
         inside_score = inside.score_transaction(
@@ -383,7 +383,7 @@ class TemporalStateTests(unittest.TestCase):
         )
 
         self.assertGreater(inside_score, 0.4)
-        self.assertEqual(boundary_score, 0.0)
+        self.assertGreater(boundary_score, 0.4)
         self.assertEqual(outside_score, 0.0)
 
     def test_timezone_offset_is_normalized_at_the_window_boundary(self):
@@ -412,7 +412,7 @@ class TemporalStateTests(unittest.TestCase):
         )
 
         self.assertGreater(inside_score, 0.4)
-        self.assertEqual(boundary_score, 0.0)
+        self.assertGreater(boundary_score, 0.4)
 
     def test_causal_chain_outranks_reversed_event_time(self):
         causal = GhostChainsEngine()
@@ -436,7 +436,7 @@ class TemporalStateTests(unittest.TestCase):
         )
 
         self.assertGreater(causal_score, reversed_score)
-        self.assertEqual(reversed_score, 0.0)
+        self.assertGreater(reversed_score, 0.0)
 
     def test_causal_return_outranks_reversed_event_time(self):
         causal = GhostChainsEngine()
@@ -478,6 +478,7 @@ class TemporalStateTests(unittest.TestCase):
         )[-1]
 
         self.assertGreater(causal_score, reversed_score)
+        self.assertGreater(reversed_score, 0.4)
 
     def test_equal_timestamps_use_arrival_sequence(self):
         causal = GhostChainsEngine()
@@ -491,7 +492,7 @@ class TemporalStateTests(unittest.TestCase):
         )
 
         self.assertGreater(causal_score, reversed_score)
-        self.assertEqual(reversed_score, 0.0)
+        self.assertGreater(reversed_score, 0.0)
 
     def test_late_event_can_bridge_to_a_later_active_event(self):
         engine = GhostChainsEngine()
@@ -508,6 +509,44 @@ class TemporalStateTests(unittest.TestCase):
         )
 
         self.assertGreater(bridge_score, 0.0)
+
+    def test_active_graph_bridge_is_not_erased_by_timestamp_order(self):
+        engine = GhostChainsEngine()
+        engine.score_transaction(
+            transaction("downstream-first", "B", "C", when=BASE_TIME)
+        )
+
+        bridge_score = engine.score_transaction(
+            transaction(
+                "upstream-later",
+                "A",
+                "B",
+                when=BASE_TIME + timedelta(minutes=1),
+            )
+        )
+
+        self.assertGreater(bridge_score, 0.0)
+
+    def test_temporal_support_decays_smoothly_inside_the_window(self):
+        def extension_score(gap: timedelta) -> float:
+            engine = GhostChainsEngine()
+            engine.score_transaction(transaction(f"first-{gap}", "A", "B"))
+            return engine.score_transaction(
+                transaction(
+                    f"second-{gap}",
+                    "B",
+                    "C",
+                    when=BASE_TIME + gap,
+                )
+            )
+
+        rapid = extension_score(timedelta(minutes=1))
+        medium = extension_score(timedelta(hours=12))
+        slow = extension_score(timedelta(hours=23))
+
+        self.assertGreater(rapid, medium)
+        self.assertGreater(medium, slow)
+        self.assertGreater(slow, 0.0)
 
     def test_repeated_edge_can_enable_a_new_causal_route(self):
         engine = GhostChainsEngine()
@@ -614,7 +653,7 @@ class TemporalStateTests(unittest.TestCase):
         self.assertEqual(would_be_return, 0.0)
         self.assertNotIn(("A", "B", 1), engine.snapshot().active_edges)
 
-    def test_out_of_order_transaction_at_cutoff_is_not_inserted(self):
+    def test_out_of_order_transaction_at_cutoff_remains_active(self):
         engine = GhostChainsEngine()
         engine.score_transaction(
             transaction("watermark", "X", "Y", when=BASE_TIME + timedelta(hours=24))
@@ -628,8 +667,8 @@ class TemporalStateTests(unittest.TestCase):
         )
 
         self.assertEqual(boundary, 0.0)
-        self.assertEqual(returning, 0.0)
-        self.assertNotIn(("A", "B", 1), engine.snapshot().active_edges)
+        self.assertGreater(returning, 0.4)
+        self.assertIn(("A", "B", 1), engine.snapshot().active_edges)
 
     def test_parallel_edge_reference_count_survives_first_expiry(self):
         engine = GhostChainsEngine()

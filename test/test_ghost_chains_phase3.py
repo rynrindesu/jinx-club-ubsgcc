@@ -314,6 +314,18 @@ class CumulativeAndStateTests(unittest.TestCase):
             )
         )
 
+        boundary = GhostChainsEngine()
+        boundary.score_transaction(transaction("boundary-old", "A", "B", 100))
+        boundary_score = boundary.score_transaction(
+            transaction(
+                "boundary-new",
+                "B",
+                "C",
+                110,
+                when=BASE_TIME + timedelta(hours=24),
+            )
+        )
+
         expired = GhostChainsEngine()
         expired.score_transaction(transaction("expired-old", "A", "B", 100))
         expired_score = expired.score_transaction(
@@ -322,11 +334,12 @@ class CumulativeAndStateTests(unittest.TestCase):
                 "B",
                 "C",
                 110,
-                when=BASE_TIME + timedelta(hours=24),
+                when=BASE_TIME + timedelta(hours=24, microseconds=1),
             )
         )
 
-        self.assertGreater(active_score, expired_score)
+        self.assertAlmostEqual(active_score, boundary_score, places=12)
+        self.assertGreater(boundary_score, expired_score)
         self.assertEqual(expired_score, 0.0)
 
     def test_retry_does_not_add_an_amount_hypothesis(self):
@@ -394,7 +407,7 @@ class GhostChainsPhase3ApiTests(unittest.TestCase):
         self.assertGreater(scores[-1], scores[-2])
         runtime = self.client.get("/ghost-chains/runtime").json()
         self.assertEqual(runtime["phase"], "3")
-        self.assertEqual(runtime["model"], "segmented-value-flow-v1")
+        self.assertEqual(runtime["model"], "segmented-value-flow-v2")
 
 
 if __name__ == "__main__":

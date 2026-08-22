@@ -169,6 +169,26 @@ class IdentityPathTests(unittest.TestCase):
         self.assertGreater(two_dimensions, one_dimension)
 
     def test_reversed_event_time_cannot_manufacture_identity_alignment(self):
+        structural = Phase1Engine()
+        structural.score_transaction(
+            transaction(
+                "plain-later-first",
+                "A",
+                "B",
+                when=BASE_TIME + timedelta(minutes=2),
+                deviceId="device-a",
+            )
+        )
+        structural_score = structural.score_transaction(
+            transaction(
+                "plain-earlier-second",
+                "B",
+                "C",
+                when=BASE_TIME + timedelta(minutes=1),
+                deviceId="device-a",
+            )
+        )
+
         engine = GhostChainsEngine()
         engine.score_transaction(
             transaction(
@@ -190,7 +210,7 @@ class IdentityPathTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(reversed_score, 0.0)
+        self.assertEqual(reversed_score, structural_score)
 
     def test_late_arriving_bridge_can_align_with_a_later_active_event(self):
         plain = Phase1Engine()
@@ -369,7 +389,7 @@ class DisconnectedIdentityTests(unittest.TestCase):
 
         self.assertEqual(score, 0.0)
 
-    def test_identity_at_the_exact_window_boundary_is_expired(self):
+    def test_identity_at_the_exact_window_boundary_is_active(self):
         engine = GhostChainsEngine()
         engine.score_transaction(
             transaction("boundary-old", "A", "B", ipAddress="10.0.0.1")
@@ -385,7 +405,7 @@ class DisconnectedIdentityTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(score, 0.0)
+        self.assertGreater(score, 0.0)
 
 
 class IdentityStateTests(unittest.TestCase):

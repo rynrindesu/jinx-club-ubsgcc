@@ -109,7 +109,7 @@ def ghost_chains_runtime_endpoint() -> dict[str, str]:
     runtime = {
         "phase": _GHOST_CHAINS_PHASE,
         "model": (
-            "segmented-value-flow-v1"
+            "segmented-value-flow-v2"
             if _GHOST_CHAINS_PHASE == "3"
             else "temporal-routes-v1"
         ),

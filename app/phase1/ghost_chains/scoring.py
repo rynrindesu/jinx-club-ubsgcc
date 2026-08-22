@@ -26,8 +26,9 @@ class ScoreConfig:
     risk_half_saturation: float = 8.0
     self_transfer_risk: float = 0.12
     max_route_signatures: int = 250_000
-    topology_weight: float = 0.82
-    temporal_weight: float = 0.18
+    topology_weight: float = 0.8
+    temporal_weight: float = 0.2
+    temporal_half_life_seconds: float = 12 * 60 * 60
 
     def __post_init__(self) -> None:
         if self.max_walk_length < 1:
@@ -50,6 +51,8 @@ class ScoreConfig:
             raise ValueError("self_transfer_risk must be in [0, 1)")
         if self.topology_weight < 0 or self.temporal_weight < 0:
             raise ValueError("structural mixture weights must be non-negative")
+        if self.temporal_half_life_seconds <= 0:
+            raise ValueError("temporal_half_life_seconds must be positive")
         if not math.isclose(
             self.topology_weight + self.temporal_weight,
             1.0,
@@ -309,7 +312,10 @@ class DiscountedWalkScorer:
         """Enumerate distinct simple entity routes in strict temporal order."""
 
         signatures: set[tuple[str, ...]] = set()
-        routes_ending_at: defaultdict[str, set[tuple[str, ...]]] = defaultdict(set)
+        route_factors: dict[tuple[str, ...], float] = {}
+        routes_ending_at: defaultdict[
+            str, dict[tuple[str, ...], datetime]
+        ] = defaultdict(dict)
 
         for event in sorted(
             events,
@@ -323,8 +329,10 @@ class DiscountedWalkScorer:
             if event.sender == event.recipient:
                 continue
 
-            additions = {(event.sender, event.recipient)}
-            for route in sorted(routes_ending_at.get(event.sender, ())):
+            additions = {(event.sender, event.recipient): event.created_at}
+            for route, started_at in sorted(
+                routes_ending_at.get(event.sender, {}).items()
+            ):
                 route_length = len(route) - 1
                 if route_length >= self.config.max_walk_length:
                     continue
@@ -332,21 +340,34 @@ class DiscountedWalkScorer:
                     continue
                 if event.recipient in route and event.recipient != route[0]:
                     continue
-                additions.add((*route, event.recipient))
+                additions[(*route, event.recipient)] = started_at
 
-            for route in sorted(additions):
-                if route in signatures:
-                    continue
-                if len(signatures) >= self.config.max_route_signatures:
+            for route, started_at in sorted(additions.items()):
+                if (
+                    route not in signatures
+                    and len(signatures) >= self.config.max_route_signatures
+                ):
                     continue
                 signatures.add(route)
-                routes_ending_at[route[-1]].add(route)
+                span = max(0.0, (event.created_at - started_at).total_seconds())
+                factor = math.exp(
+                    -math.log(2.0)
+                    * span
+                    / self.config.temporal_half_life_seconds
+                )
+                route_factors[route] = max(route_factors.get(route, 0.0), factor)
+                if route[0] == route[-1]:
+                    continue
+                previous_start = routes_ending_at[route[-1]].get(route)
+                if previous_start is None or started_at > previous_start:
+                    routes_ending_at[route[-1]][route] = started_at
 
-        return self._state_from_signatures(signatures)
+        return self._state_from_signatures(signatures, route_factors)
 
     def _state_from_signatures(
         self,
         signatures: Iterable[tuple[str, ...]],
+        route_factors: Mapping[tuple[str, ...], float] | None = None,
     ) -> _RouteState:
         route_weights: defaultdict[tuple[str, str], list[float]] = defaultdict(list)
         shortest_distances: dict[tuple[str, str], int] = {}
@@ -359,6 +380,8 @@ class DiscountedWalkScorer:
                 if pair[0] == pair[1]
                 else self.config.walk_discount ** (length - 1)
             )
+            if route_factors is not None:
+                weight *= route_factors.get(route, 0.0)
             route_weights[pair].append(weight)
             previous_distance = shortest_distances.get(pair)
             if previous_distance is None or length < previous_distance:
