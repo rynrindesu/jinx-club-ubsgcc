@@ -212,6 +212,23 @@ class AdaptiveGatewayPhase2Tests(unittest.TestCase):
 
         self.assertEqual(result["sloOutput"], {"availability": 1.0, "p95LatencyMs": 500})
 
+    def test_p95_uses_the_latency_range_that_ends_at_95_percent(self):
+        self.body["heartbeats"] = [
+            {
+                "service": "metrics",
+                "timestamp": 1710000130 + latency,
+                "latencyMs": latency,
+                "status": "OK",
+            }
+            for latency in range(1, 21)
+        ]
+        self.body["sloQuery"] = {"service": "metrics", "since": 1710000130}
+
+        result = solve(encode_payload(self.body))
+
+        # With 20 records, each range is 5%. 95% is in the 19th range.
+        self.assertEqual(result["sloOutput"], {"availability": 1.0, "p95LatencyMs": 19})
+
     def test_rejects_malformed_payloads_and_invalid_field_values(self):
         invalid_cases = [
             ("missing priority", lambda body: body["adaptInput"]["metadata"].pop("priority")),

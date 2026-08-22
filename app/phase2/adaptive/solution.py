@@ -87,7 +87,7 @@ def calculate_slo(
         _required(slo_query, "since", "sloQuery"), "sloQuery.since"
     )
 
-    matching_heartbeats = []
+    heartbeats_by_service: dict[str, list[dict[str, Any]]] = {}
     for index, heartbeat_value in enumerate(heartbeats):
         location = f"heartbeats[{index}]"
         heartbeat = _object(heartbeat_value, location)
@@ -102,8 +102,19 @@ def calculate_slo(
             raise PayloadValidationError(f"{location}.latencyMs must not be negative")
         status = _text(_required(heartbeat, "status", location), f"{location}.status")
 
-        if service == requested_service and timestamp >= since_timestamp:
-            matching_heartbeats.append({"latencyMs": latency_ms, "status": status})
+        heartbeats_by_service.setdefault(service, []).append(
+            {
+                "timestamp": timestamp,
+                "latencyMs": latency_ms,
+                "status": status,
+            }
+        )
+
+    matching_heartbeats = [
+        heartbeat
+        for heartbeat in heartbeats_by_service.get(requested_service, [])
+        if heartbeat["timestamp"] >= since_timestamp
+    ]
 
     if not matching_heartbeats:
         return {"availability": 0.0, "p95LatencyMs": 0}
@@ -113,13 +124,26 @@ def calculate_slo(
     )
     availability = successful_heartbeats / len(matching_heartbeats)
 
-    latencies = sorted(heartbeat["latencyMs"] for heartbeat in matching_heartbeats)
-    p95_index = math.ceil(0.95 * len(latencies)) - 1
-
     return {
         "availability": availability,
-        "p95LatencyMs": latencies[p95_index],
+        "p95LatencyMs": p95_latency_ms(matching_heartbeats),
     }
+
+
+def p95_latency_ms(heartbeats: list[dict[str, Any]]) -> int | float:
+    """Select the sorted latency whose right-inclusive range contains 95%."""
+
+    latencies = sorted(heartbeat["latencyMs"] for heartbeat in heartbeats)
+    heartbeat_count = len(latencies)
+
+    for index, latency in enumerate(latencies):
+        lower_percent = index / heartbeat_count * 100
+        upper_percent = (index + 1) / heartbeat_count * 100
+        if lower_percent < 95 <= upper_percent:
+            return latency
+
+    # The loop always finds a range for 95, but this keeps the helper total.
+    return latencies[-1]
 
 
 def solve(payload: str) -> dict[str, dict[str, Any]]:
