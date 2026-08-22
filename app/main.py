@@ -25,8 +25,10 @@ from .phase3.ghost_chains import (
 from .showdown import decide_move
 from .phase1.toolbox.server import mcp
 from .phase2.toolbox.server import register_tools as register_phase2_toolbox_tools
+from .phase3.toolbox.server import register_tools as register_phase3_toolbox_tools
 
 register_phase2_toolbox_tools(mcp)
+register_phase3_toolbox_tools(mcp)
 
 mcp_app = mcp.http_app(path="/")
 
