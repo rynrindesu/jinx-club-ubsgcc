@@ -10,9 +10,10 @@ from urllib.parse import quote
 import httpx
 from fastmcp import FastMCP
 
-from .venues import normalise_day, open_venue_names, validate_hour
+from .venues import normalise_day, open_venue_names, open_venues, validate_hour
 from .meetings import find_meeting_window
 from .locations import best_meeting_point
+from .outings import best_outing_plan
 
 
 DEFAULT_CHALLENGE_URL = "https://tool-box-2591eaa24fa3.herokuapp.com"
@@ -85,6 +86,45 @@ def register_tools(mcp: FastMCP) -> None:
             raise ValueError("each friend must be listed only once")
         locations = [_fetch_location(person, canonical_day) for person in people]
         return best_meeting_point(own_location, locations)
+
+    @mcp.tool(
+        name="plan_outing",
+        description=(
+            "Plan the complete outing: return the required common meeting window, "
+            "a meeting point, and a place to eat after the meeting. It minimizes all "
+            "travel to the meeting point plus the one trip from that point to a venue "
+            "open exactly when the meeting ends. Supply weekday, every friend's name, "
+            "the android's [x, y], requested bounds, and duration in minutes."
+        ),
+    )
+    def plan_outing(
+        day: str,
+        people: list[str],
+        own_location: list[int],
+        earliest_time: str,
+        latest_time: str,
+        duration_minutes: int,
+    ) -> dict[str, object]:
+        canonical_day = normalise_day(day)
+        if not people:
+            raise ValueError("at least one friend is required")
+        if len(set(people)) != len(people):
+            raise ValueError("each friend must be listed only once")
+        inbox = _fetch_inbox()
+        schedules = {person: _fetch_schedule(person, canonical_day) for person in people}
+        meeting_window = find_meeting_window(
+            canonical_day,
+            people,
+            earliest_time,
+            latest_time,
+            duration_minutes,
+            inbox,
+            schedules,
+        )
+        meeting_end = meeting_window.split(",", maxsplit=1)[1].strip()
+        venues = open_venues(_fetch_venues(canonical_day), meeting_end)
+        locations = [_fetch_location(person, canonical_day) for person in people]
+        return best_outing_plan(meeting_window, own_location, locations, venues)
 
 
 def _venues_url() -> str:

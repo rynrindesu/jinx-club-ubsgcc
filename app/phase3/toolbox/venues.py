@@ -38,11 +38,17 @@ def open_venue_names(payload: Mapping[str, Any], time: str) -> str:
     requested hour is usable, while one closing at that hour is not.
     """
 
+    return ", ".join(venue["name"] for venue in open_venues(payload, time))
+
+
+def open_venues(payload: Mapping[str, Any], time: str) -> list[Mapping[str, Any]]:
+    """Return every complete venue record open at ``time``."""
+
     raw_venues = payload.get("venues")
     if not isinstance(raw_venues, Sequence) or isinstance(raw_venues, (str, bytes)):
         raise ValueError("venues response must contain a venues array")
 
-    matches: list[str] = []
+    matches: list[Mapping[str, Any]] = []
     for venue in raw_venues:
         if not isinstance(venue, Mapping):
             raise ValueError("each venue must be an object")
@@ -53,8 +59,8 @@ def open_venue_names(payload: Mapping[str, Any], time: str) -> str:
         ):
             raise ValueError("each venue must contain a name and availability array")
         if any(_contains_hour(interval, time) for interval in intervals):
-            matches.append(name)
-    return ", ".join(matches)
+            matches.append(venue)
+    return matches
 
 
 def _contains_hour(interval: object, time: str) -> bool:

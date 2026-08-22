@@ -7,6 +7,7 @@ from app.main import app
 from app.phase3.toolbox import server as toolbox_server
 from app.phase3.toolbox.meetings import find_meeting_window, own_calendar_blocks
 from app.phase3.toolbox.locations import best_meeting_point
+from app.phase3.toolbox.outings import best_outing_plan
 from app.phase3.toolbox.venues import open_venue_names, validate_hour
 
 
@@ -128,6 +129,28 @@ class MeetingPointTests(unittest.TestCase):
         )
 
 
+class OutingTests(unittest.TestCase):
+    def test_selects_the_jointly_optimal_point_and_open_venue(self):
+        plan = best_outing_plan(
+            "13:00, 14:00",
+            [0, 3],
+            [{"person": "cira", "x": 8, "y": 1}, {"person": "iris", "x": 4, "y": 7}],
+            [
+                {"name": "Near Cafe", "x": 1, "y": 1},
+                {"name": "Far Cafe", "x": 9, "y": 9},
+            ],
+        )
+
+        self.assertEqual(
+            plan,
+            {
+                "meeting_window": ["13:00", "14:00"],
+                "meeting_point": [1, 1],
+                "place_to_eat": "Near Cafe",
+            },
+        )
+
+
 class McpDiscoveryTests(unittest.TestCase):
     def test_advertises_the_phase3_tool(self):
         initialize = {
@@ -160,3 +183,4 @@ class McpDiscoveryTests(unittest.TestCase):
         self.assertIn('"name":"find_open_venues"', response.text)
         self.assertIn('"name":"find_meeting_time"', response.text)
         self.assertIn('"name":"find_meeting_point"', response.text)
+        self.assertIn('"name":"plan_outing"', response.text)
