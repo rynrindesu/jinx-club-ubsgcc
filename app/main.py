@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from .phase2.adaptive.solution import solve
 from .phase1.kanchiong_delivery_driver.solution import solve_case
-from .phase1.showdown import decide_move
+from .showdown import decide_move
 from .phase1.toolbox.server import mcp
 
 mcp_app = mcp.http_app(path="/")
