@@ -45,6 +45,11 @@ class VenueFetchTests(unittest.TestCase):
         self.assertTrue(get.call_args.args[0].endswith("/venues/Thursday"))
 
 
+class InboxEndpointTests(unittest.TestCase):
+    def test_uses_the_emails_endpoint_by_default(self):
+        self.assertTrue(toolbox_server._inbox_url().endswith("/emails"))
+
+
 class MeetingTimeTests(unittest.TestCase):
     inbox = """From: Marek Sould <m.sould@kesterline.example>
 Response: ACCEPTED

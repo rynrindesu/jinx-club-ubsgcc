@@ -92,7 +92,7 @@ def _cached_venues(venues_url: str, day: str) -> dict[str, Any]:
 
 def _inbox_url() -> str:
     base_url = os.getenv("TOOLBOX_CHALLENGE_URL", DEFAULT_CHALLENGE_URL).rstrip("/")
-    return os.getenv("TOOLBOX_INBOX_URL", f"{base_url}/inbox")
+    return os.getenv("TOOLBOX_INBOX_URL", f"{base_url}/emails")
 
 
 def _schedule_url() -> str:
