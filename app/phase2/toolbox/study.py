@@ -14,8 +14,9 @@ import httpx
 
 
 TOKEN_BUDGET = 900
-MAX_PASSAGES = 3
-MAX_PASSAGE_TOKENS = 260
+MAX_PASSAGES = 2
+MAX_PASSAGE_TOKENS = 220
+MAX_WINDOW_SENTENCES = 3
 _STOP_WORDS = frozenset(
     {
         "a", "an", "and", "are", "at", "by", "did", "do", "for", "from",
@@ -28,14 +29,24 @@ _SYNONYM_GROUPS = (
     frozenset({"mechanical", "machinery", "machine", "equipment", "compressor", "engine"}),
     frozenset({"cold", "refrigeration", "refrigerated", "chilled", "freezer"}),
     frozenset({"threaten", "risk", "endanger", "jeopardize"}),
+    frozenset({"cause", "because", "due", "reason", "root", "traced"}),
 )
 _STEM_EQUIVALENTS = {
+    "caused": "cause",
+    "causes": "cause",
+    "causing": "cause",
     "stored": "store",
     "storage": "store",
     "stores": "store",
     "threatened": "threaten",
     "threatening": "threaten",
 }
+_DATE_PATTERN = re.compile(
+    r"\b(?:\d{1,2}\s+(?:january|february|march|april|may|june|july|august|"
+    r"september|october|november|december)|(?:january|february|march|april|may|"
+    r"june|july|august|september|october|november|december)\s+\d{1,2})\b",
+    re.IGNORECASE,
+)
 
 
 class Encoder(Protocol):
@@ -52,10 +63,10 @@ class StudyDocument:
 
 
 @dataclass(frozen=True)
-class _SentenceCandidate:
+class _SpanCandidate:
     score: int
     matched_terms: frozenset[str]
-    source: tuple[str, str, int]
+    source: tuple[str, str, int, int]
     passage: str
 
 
@@ -145,17 +156,23 @@ def select_passages(
     encoder = encoder or _o200k_encoder()
     terms = _query_terms(question)
     phrases = _query_phrases(question)
-    candidates: list[_SentenceCandidate] = []
+    answer_signals = _answer_signals(question)
+    candidates: list[_SpanCandidate] = []
     for document in documents:
-        candidates.extend(_sentence_candidates(document, terms, phrases))
+        candidates.extend(_span_candidates(document, terms, phrases, answer_signals))
     if not candidates:
         raise ValueError("the study documents contained no usable sentences")
 
     chosen: list[str] = []
     remaining = TOKEN_BUDGET
     covered_terms: set[str] = set()
-    selected_sources: list[tuple[str, str, int]] = []
-    for candidate in sorted(candidates, key=lambda candidate: candidate.score, reverse=True):
+    selected_sources: list[tuple[str, str, int, int]] = []
+    ranked = sorted(
+        ((candidate, encoder.encode(candidate.passage)) for candidate in candidates),
+        key=lambda item: (item[0].score - 0.02 * len(item[1]), item[0].score),
+        reverse=True,
+    )
+    for candidate, tokens in ranked:
         if candidate.score <= 0 or remaining == 0 or len(chosen) == MAX_PASSAGES:
             continue
         if _overlaps_selected_window(candidate.source, selected_sources):
@@ -163,7 +180,6 @@ def select_passages(
         if chosen and not candidate.matched_terms - covered_terms:
             continue
 
-        tokens = encoder.encode(candidate.passage)
         passage_budget = min(remaining, MAX_PASSAGE_TOKENS)
         if len(tokens) <= passage_budget:
             chosen.append(candidate.passage)
@@ -175,7 +191,7 @@ def select_passages(
         selected_sources.append(candidate.source)
 
     if not chosen:
-        # Return one compact sentence window even if no words match exactly.
+        # Return one compact evidence span even if no words match exactly.
         tokens = encoder.encode(candidates[0].passage)
         passage_budget = min(TOKEN_BUDGET, MAX_PASSAGE_TOKENS)
         chosen.append(
@@ -240,26 +256,38 @@ def _parse_html(value: str) -> _StudyPageParser:
     return parser
 
 
-def _sentence_candidates(
+def _span_candidates(
     document: StudyDocument,
     query_terms: set[str],
     query_phrases: set[str],
-) -> list[_SentenceCandidate]:
-    candidates: list[_SentenceCandidate] = []
+    answer_signals: set[str],
+) -> list[_SpanCandidate]:
+    """Generate compact, contiguous evidence spans around every sentence."""
+
+    candidates: list[_SpanCandidate] = []
     for heading, section in _sections(document):
         sentences = _sentences(section)
-        for index, sentence in enumerate(sentences):
-            score, matched_terms = _sentence_score(
-                heading, sentence, query_terms, query_phrases
-            )
-            candidates.append(
-                _SentenceCandidate(
-                    score=score,
-                    matched_terms=frozenset(matched_terms),
-                    source=(document.url, heading, index),
-                    passage=_sentence_window(heading, sentences, index),
+        for start in range(len(sentences)):
+            for end in range(
+                start + 1,
+                min(len(sentences), start + MAX_WINDOW_SENTENCES) + 1,
+            ):
+                evidence = " ".join(sentences[start:end])
+                score, matched_terms = _span_score(
+                    heading,
+                    evidence,
+                    query_terms,
+                    query_phrases,
+                    answer_signals,
                 )
-            )
+                candidates.append(
+                    _SpanCandidate(
+                        score=score,
+                        matched_terms=frozenset(matched_terms),
+                        source=(document.url, heading, start, end),
+                        passage=f"{heading}\n{evidence}",
+                    )
+                )
     return candidates
 
 
@@ -299,29 +327,17 @@ def _sentences(text: str) -> list[str]:
     ]
 
 
-def _sentence_window(heading: str, sentences: list[str], index: int) -> str:
-    """Return a matching sentence, adding context only for anaphoric wording."""
-
-    context = [f"{heading}\n{sentences[index]}"]
-    if index > 0 and re.match(
-        r"^(it|this|that|they|these|those|the (incident|event|failure))\b",
-        sentences[index],
-        re.IGNORECASE,
-    ):
-        context.append(f"Previous context: {sentences[index - 1]}")
-    return "\n".join(context)
-
-
 def _overlaps_selected_window(
-    source: tuple[str, str, int],
-    selected_sources: list[tuple[str, str, int]],
+    source: tuple[str, str, int, int],
+    selected_sources: list[tuple[str, str, int, int]],
 ) -> bool:
-    url, heading, sentence_index = source
+    url, heading, start, end = source
     return any(
         selected_url == url
         and selected_heading == heading
-        and abs(selected_index - sentence_index) <= 2
-        for selected_url, selected_heading, selected_index in selected_sources
+        and start < selected_end
+        and selected_start < end
+        for selected_url, selected_heading, selected_start, selected_end in selected_sources
     )
 
 
@@ -342,27 +358,42 @@ def _query_phrases(question: str) -> set[str]:
     return {f"{first} {second}" for first, second in zip(terms, terms[1:])}
 
 
-def _sentence_score(
+def _answer_signals(question: str) -> set[str]:
+    lowered = question.lower()
+    signals: set[str] = set()
+    if "when" in lowered or "date" in lowered or "what day" in lowered:
+        signals.add("date")
+    if "how many" in lowered or "how much" in lowered or "number of" in lowered:
+        signals.add("number")
+    return signals
+
+
+def _span_score(
     heading: str,
-    sentence: str,
+    evidence: str,
     query_terms: set[str],
     query_phrases: set[str],
+    answer_signals: set[str],
 ) -> tuple[int, set[str]]:
-    sentence_terms = {_normalise_term(term) for term in _tokens(f"{heading} {sentence}")}
-    exact_matches = sentence_terms & query_terms
+    evidence_terms = {_normalise_term(term) for term in _tokens(f"{heading} {evidence}")}
+    exact_matches = evidence_terms & query_terms
     synonym_matches = {
         term
         for term in query_terms - exact_matches
-        if sentence_terms & _synonyms_for(term)
+        if evidence_terms & _synonyms_for(term)
     }
-    score = len(exact_matches) * 8 + len(synonym_matches) * 3
+    score = len(exact_matches) * 10 + len(synonym_matches) * 4
 
     # Reward adjacent query phrases such as "cold store" without requiring the
     # source to use the same hyphenation as the question.
-    normalised_sentence = " ".join(_normalise_term(term) for term in _tokens(sentence))
+    normalised_evidence = " ".join(_normalise_term(term) for term in _tokens(evidence))
     for phrase in query_phrases:
-        if phrase in normalised_sentence:
+        if phrase in normalised_evidence:
             score += 4
+    if "date" in answer_signals and _DATE_PATTERN.search(evidence):
+        score += 6
+    if "number" in answer_signals and re.search(r"\b\d+(?:\.\d+)?\b", evidence):
+        score += 4
     return score, exact_matches | synonym_matches
 
 

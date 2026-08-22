@@ -125,6 +125,28 @@ class StudySelectionTests(unittest.TestCase):
         self.assertNotIn("Routine inventory checks", passages[0])
         self.assertLessEqual(len(passages[0]), 260)
 
+    def test_returns_adjacent_context_when_it_contains_the_answer(self):
+        documents = (
+            StudyDocument(
+                "Growers Cooperative",
+                "https://example.test/growers",
+                "## Incident Reports\n"
+                "A refrigeration compressor failure on 6 April threatened the stored fruit. "
+                "Investigators traced the failure to a worn drive belt. "
+                "The replacement belt was fitted the next morning.",
+            ),
+        )
+
+        passages = select_passages(
+            "What caused the compressor failure?",
+            documents,
+            CharacterEncoder(),
+        )
+
+        self.assertEqual(len(passages), 1)
+        self.assertIn("worn drive belt", passages[0])
+        self.assertLessEqual(len(passages[0]), 220)
+
 
 class McpDiscoveryTests(unittest.TestCase):
     def test_advertises_the_phase2_tools(self):
