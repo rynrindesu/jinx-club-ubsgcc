@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import cmp_to_key
+from math import log
 from typing import Any, Iterable
 
 
@@ -545,6 +546,16 @@ def _future_sale(
                 -item[0],
             ),
         )
+    elif policy == "calendar_rate":
+        target_index, sell_price, _ = max(
+            candidates,
+            key=lambda item: (
+                (log(item[1]) - log(listing.price))
+                / max(1, abs(route[item[0]] - listing.year)),
+                item[1],
+                -item[0],
+            ),
+        )
     elif policy == "home":
         home_candidates = [
             candidate
@@ -566,7 +577,9 @@ def _future_sale(
 
 
 def _buy_order_key(
-    candidate: tuple[int, _Listing, int, int], policy: str
+    candidate: tuple[int, _Listing, int, int],
+    policy: str,
+    route: list[int],
 ) -> tuple[Any, ...]:
     _, listing, target_index, sell_price = candidate
     profit = sell_price - listing.price
@@ -582,6 +595,13 @@ def _buy_order_key(
         )
     if policy == "total_profit":
         return (-profit * listing.qty, -Fraction(profit, listing.price), listing.stock)
+    if policy == "rate":
+        distance = max(1, abs(route[target_index] - listing.year))
+        return (
+            -(log(sell_price) - log(listing.price)) / distance,
+            -Fraction(profit, listing.price),
+            listing.stock,
+        )
     return (-Fraction(profit, listing.price), -profit, listing.stock)
 
 
@@ -666,7 +686,9 @@ def _simulate_sweep(
                 (listing_index, listing, target_index, sell_price)
             )
 
-        candidates.sort(key=lambda item: _buy_order_key(item, buy_policy))
+        candidates.sort(
+            key=lambda item: _buy_order_key(item, buy_policy, route)
+        )
         quantities = (
             _knapsack_quantities(candidates, cash)
             if buy_policy == "knapsack"
@@ -708,15 +730,22 @@ def _best_sweep(
     best_cash = capital
     best_actions: list[str] = []
     sale_policies = (
-        ("peak", "earliest", "quick_profit")
+        ("peak", "earliest", "quick_profit", "calendar_rate")
         if len(listings) > 250
-        else ("peak", "earliest", "quick_profit", "home")
+        else (
+            "peak",
+            "earliest",
+            "quick_profit",
+            "calendar_rate",
+            "home",
+        )
     )
     buy_policies = (
-        ("roi", "cheap", "quick", "total_profit")
+        ("roi", "rate", "cheap", "quick", "total_profit")
         if len(listings) > 80
         else (
             "roi",
+            "rate",
             "unit_profit",
             "cheap",
             "quick",
