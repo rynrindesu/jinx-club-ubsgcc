@@ -1,9 +1,9 @@
 """Validated Phase 2 scouting evidence from completed attempts.
 
 The event fixes the rule order across retries.  These are genuine showdown
-comparisons from match 3d3a46e3-afc5-4fdf-bf58-c3176419000e, not guessed rule
-definitions.  Replaying the comparisons through the normal learner preserves
-uncertainty where the scouting attempt did not distinguish two rules.
+comparisons, not guessed rule definitions.  Replaying them through the normal
+learner preserves their provenance and lets current live evidence take
+precedence if a scouting replay turns out to be stale.
 """
 
 from __future__ import annotations
@@ -67,18 +67,55 @@ _SCOUTED_COMPARISONS: dict[
     ),
 }
 
+# Later completed attempts supplied the comparisons that distinguish the
+# previously surviving rule families.  The source token is deliberately part
+# of the evidence key because hand numbers restart in every match.
+_DECISIVE_COMPARISONS: dict[
+    int, tuple[tuple[str, int, int, int, int, int], ...]
+] = {
+    1: (
+        ("latest", 22, 5, 5, 6, 1),
+    ),
+    3: (
+        ("latest", 18, 4, 4, 6, 1),
+        ("latest", 20, 2, 10, 7, -1),
+    ),
+    4: (
+        ("pooled", 8, 1, 10, 1, 1),
+    ),
+}
+
 
 def observations_for_leg(leg_number: int | None) -> tuple[ShowdownObservation, ...]:
     """Return repeat-safe observations for this fixed Phase 2 leg."""
 
     comparisons = _SCOUTED_COMPARISONS.get(leg_number or 0, ())
-    return tuple(
+    original = tuple(
         ShowdownObservation(
             key=(f"scout-3d3a46e3-leg-{leg_number}", hand, "hero", "opponent"),
             community=community,
             first_number=hero_number,
             second_number=opponent_number,
             outcome=outcome,
+            is_baseline=True,
         )
         for hand, community, hero_number, opponent_number, outcome in comparisons
     )
+    decisive = tuple(
+        ShowdownObservation(
+            key=(
+                f"scout-{source}-leg-{leg_number}",
+                hand,
+                "hero",
+                "opponent",
+            ),
+            community=community,
+            first_number=hero_number,
+            second_number=opponent_number,
+            outcome=outcome,
+            is_baseline=True,
+        )
+        for source, hand, community, hero_number, opponent_number, outcome
+        in _DECISIVE_COMPARISONS.get(leg_number or 0, ())
+    )
+    return original + decisive

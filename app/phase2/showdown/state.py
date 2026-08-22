@@ -43,6 +43,7 @@ class OpponentProfile:
     decisions: int
     range_samples: tuple[RangeEvidence, ...] = ()
     range_shown_hands: int = 0
+    open_reraises: int = 0
 
     @property
     def tight_folder(self) -> bool:
@@ -69,7 +70,14 @@ class OpponentProfile:
     def punishes_opens(self) -> bool:
         """Return whether one observed open already drew a re-raise."""
 
-        return self.open_responses >= 1 and self.reraise_rate > 0.30
+        # The smoothed rate is deliberately slow to react before the first
+        # re-raise, but it also falls back through the old threshold after a
+        # handful of calls.  A demonstrated punish is more important than
+        # that later dilution: keep it for the lifetime of this opponent
+        # profile (one attempt).
+        return self.open_reraises > 0 or (
+            self.open_responses >= 1 and self.reraise_rate > 0.30
+        )
 
     @property
     def punishes_post_bets(self) -> bool:
@@ -87,15 +95,21 @@ class OpponentProfile:
 
         uniform = (1 / 13,) * 13
         context = _live_range_context(payload)
-        if (
-            context is None
-            or self.range_shown_hands < 6
-            or not self.range_samples
-            or rule_knowledge.observation_count == 0
-        ):
+        if context is None or rule_knowledge.observation_count == 0:
             return uniform
 
         current_action, size_bucket, position, round_name = context
+        raw_community = _integer(payload.get("community_number"))
+        community = (
+            raw_community
+            if raw_community is not None and 1 <= raw_community <= 13
+            else None
+        )
+        prior = _action_range_prior(
+            current_action,
+            community=community,
+            rule_knowledge=rule_knowledge,
+        )
         contextual_samples: list[tuple[RangeEvidence, float]] = []
         for sample in self.range_samples:
             action_weight = _action_similarity(current_action, sample.action)
@@ -103,7 +117,7 @@ class OpponentProfile:
             position_weight = _context_similarity(position, sample.position)
             size_weight = (
                 _context_similarity(size_bucket, sample.size_bucket)
-                if current_action in {"bet", "raise"}
+                if current_action in {"bet", "raise", "reraise"}
                 else 1.0
             )
             weight = (
@@ -116,15 +130,9 @@ class OpponentProfile:
             if weight > 0:
                 contextual_samples.append((sample, weight))
         if not contextual_samples:
-            return uniform
+            return prior
 
         denominator = sum(weight for _, weight in contextual_samples)
-        raw_community = _integer(payload.get("community_number"))
-        community = (
-            raw_community
-            if raw_community is not None and 1 <= raw_community <= 13
-            else None
-        )
         likelihoods: list[float] = []
         for number in range(1, 14):
             strength = rule_knowledge.estimate(number, community).mean
@@ -137,7 +145,23 @@ class OpponentProfile:
             # assigning zero probability to any legal private number.
             likelihoods.append(0.20 + similarity)
         total = sum(likelihoods)
-        return tuple(likelihood / total for likelihood in likelihoods)
+        observed = tuple(likelihood / total for likelihood in likelihoods)
+
+        # Each shown hand contributes at most one effective sample even when
+        # it contains actions on both streets.  Context and rule reliability
+        # discount weakly related observations.  Four prior pseudo-hands make
+        # the first reveal useful without letting it erase the conservative
+        # action prior; observed behavior takes over as the sample grows.
+        effective_samples = min(
+            float(self.range_shown_hands),
+            sum(min(1.0, weight / 4.0) for _, weight in contextual_samples),
+        )
+        observed_share = effective_samples / (effective_samples + 4.0)
+        return tuple(
+            (1.0 - observed_share) * prior_weight
+            + observed_share * observed_weight
+            for prior_weight, observed_weight in zip(prior, observed)
+        )
 
 
 @dataclass
@@ -267,9 +291,16 @@ class AttemptState:
             opponent_seat,
             hand.get("button_seat"),
         )
-        pot = max(1, _integer(hand.get("pot")) or 1)
+        action_contexts = _range_action_contexts(
+            actions,
+            final_pot=hand.get("pot"),
+            button_seat=hand.get("button_seat"),
+            small_blind=hand.get("small_blind"),
+            big_blind=hand.get("big_blind"),
+            seats=shown.keys(),
+        )
         added = False
-        for action in actions:
+        for index, action in enumerate(actions):
             action_name = str(action.get("action", ""))
             if (
                 str(action.get("seat")) != str(opponent_seat)
@@ -292,8 +323,8 @@ class AttemptState:
             self.range_samples.append(
                 RangeEvidence(
                     strength=estimate.mean,
-                    action=action_name,
-                    size_bucket=_size_bucket(action, pot),
+                    action=action_contexts[index][0],
+                    size_bucket=action_contexts[index][1],
                     position=position,
                     round_name=round_name,
                     reliability=reliability,
@@ -328,6 +359,7 @@ class AttemptState:
             decisions=self.decisions,
             range_samples=tuple(self.range_samples),
             range_shown_hands=self.range_shown_hands,
+            open_reraises=self.open_reraises,
         )
 
 
@@ -448,6 +480,147 @@ def _next_other_action(
     return None
 
 
+def _action_range_prior(
+    action: str,
+    *,
+    community: int | None,
+    rule_knowledge: RuleKnowledge,
+) -> tuple[float, ...]:
+    """Return a soft rule-relative prior for an opponent's live action.
+
+    A first wager is modeled as roughly the strongest third of the private
+    numbers and a re-raise as roughly the strongest fifth.  The likelihood
+    floor is intentionally substantial: this is a cautious default, not a
+    claim that an unknown opponent can never bluff.
+    """
+
+    uniform = (1 / 13,) * 13
+    if action not in {"bet", "raise", "reraise"}:
+        return uniform
+
+    if action == "reraise":
+        cutoff, transition, floor = 0.80, 0.075, 0.20
+    else:
+        cutoff, transition, floor = 0.66, 0.085, 0.45
+
+    likelihoods: list[float] = []
+    for number in range(1, 14):
+        strength = rule_knowledge.estimate(number, community).mean
+        selected = 1.0 / (1.0 + math.exp(-(strength - cutoff) / transition))
+        likelihoods.append(floor + (1.0 - floor) * selected)
+    total = sum(likelihoods)
+    if total <= 0:
+        return uniform
+    return tuple(likelihood / total for likelihood in likelihoods)
+
+
+def _range_action_contexts(
+    actions: list[Mapping[str, object]],
+    *,
+    final_pot: object,
+    button_seat: object,
+    small_blind: object,
+    big_blind: object,
+    seats: Iterable[object] = (),
+) -> list[tuple[str, str]]:
+    """Classify and size actions using round increments and prior pot.
+
+    SHOWDOWN action amounts are totals committed on that betting round.  The
+    request pot is after every listed live action, while a saved hand's pot is
+    after every listed historical action.  Walking the same contribution
+    ledger for both lets us subtract later increments and recover the pot that
+    existed immediately before each action.
+    """
+
+    parsed_small = _integer(small_blind)
+    parsed_big = _integer(big_blind)
+    small = max(0, parsed_small if parsed_small is not None else 1)
+    big = max(small, parsed_big if parsed_big is not None else 2)
+
+    seat_keys: list[str] = []
+    for seat in seats:
+        if seat is None:
+            continue
+        key = str(seat)
+        if key not in seat_keys:
+            seat_keys.append(key)
+    for action in actions:
+        seat = action.get("seat")
+        if seat is None:
+            continue
+        key = str(seat)
+        if key not in seat_keys:
+            seat_keys.append(key)
+
+    button_key = str(button_seat) if button_seat is not None else ""
+    if not button_key:
+        first_pre = next(
+            (
+                action
+                for action in actions
+                if str(action.get("round", "")) == "pre_reveal"
+                and action.get("seat") is not None
+            ),
+            None,
+        )
+        if first_pre is not None:
+            button_key = str(first_pre.get("seat"))
+    if button_key and button_key not in seat_keys:
+        seat_keys.append(button_key)
+
+    pre_commitments: dict[str, int] = {}
+    if button_key:
+        pre_commitments[button_key] = small
+        for key in seat_keys:
+            if key != button_key:
+                pre_commitments[key] = big
+
+    commitments: dict[str, dict[str, int]] = {}
+    increments: list[int] = []
+    prior_totals: list[int] = []
+    classified_actions: list[str] = []
+    wager_seen: dict[str, bool] = {}
+    for action in actions:
+        round_name = str(action.get("round", ""))
+        seat_key = str(action.get("seat", ""))
+        if round_name not in commitments:
+            commitments[round_name] = (
+                dict(pre_commitments) if round_name == "pre_reveal" else {}
+            )
+        round_commitments = commitments[round_name]
+        previous = max(0, round_commitments.get(seat_key, 0))
+        prior_totals.append(previous)
+
+        verb = str(action.get("action", ""))
+        classified = verb
+        if verb == "raise" and wager_seen.get(round_name, False):
+            classified = "reraise"
+        classified_actions.append(classified)
+
+        amount = _integer(action.get("amount"))
+        if verb == "call" and amount is None:
+            amount = max(round_commitments.values(), default=previous)
+        increment = 0
+        if verb in {"call", "bet", "raise"} and amount is not None:
+            increment = max(0, amount - previous)
+            round_commitments[seat_key] = max(previous, amount)
+        increments.append(increment)
+        if verb in {"bet", "raise"}:
+            wager_seen[round_name] = True
+
+    parsed_final_pot = _integer(final_pot)
+    if parsed_final_pot is None or parsed_final_pot <= 0:
+        parsed_final_pot = max(1, small + big + sum(increments))
+    pot_before = max(1, parsed_final_pot - sum(increments))
+    contexts: list[tuple[str, str]] = []
+    for action, classified, previous, increment in zip(
+        actions, classified_actions, prior_totals, increments
+    ):
+        contexts.append((classified, _size_bucket(action, pot_before, previous)))
+        pot_before += increment
+    return contexts
+
+
 def _live_range_context(
     payload: Mapping[str, object],
 ) -> tuple[str, str, str, str] | None:
@@ -456,10 +629,23 @@ def _live_range_context(
         return None
     your_seat = payload.get("your_seat")
     round_name = str(payload.get("round", ""))
-    pot = max(1, _integer(payload.get("pot")) or 1)
-    for action in reversed(actions):
-        if not isinstance(action, Mapping):
-            continue
+    materialized = [action for action in actions if isinstance(action, Mapping)]
+    players = payload.get("players")
+    seats = (
+        [player.get("seat") for player in players if isinstance(player, Mapping)]
+        if isinstance(players, list)
+        else []
+    )
+    action_contexts = _range_action_contexts(
+        materialized,
+        final_pot=payload.get("pot"),
+        button_seat=payload.get("button_seat"),
+        small_blind=payload.get("small_blind"),
+        big_blind=payload.get("big_blind"),
+        seats=seats,
+    )
+    for index in range(len(materialized) - 1, -1, -1):
+        action = materialized[index]
         action_name = str(action.get("action", ""))
         if (
             str(action.get("seat")) == str(your_seat)
@@ -467,8 +653,8 @@ def _live_range_context(
         ):
             continue
         return (
-            action_name,
-            _size_bucket(action, pot),
+            action_contexts[index][0],
+            action_contexts[index][1],
             _position(action.get("seat"), payload.get("button_seat")),
             str(action.get("round", round_name)),
         )
@@ -478,7 +664,11 @@ def _live_range_context(
 def _action_similarity(current: str, observed: str) -> float:
     if current == observed:
         return 4.0
-    if current in {"bet", "raise"} and observed in {"bet", "raise"}:
+    if current in {"bet", "raise", "reraise"} and observed in {
+        "bet",
+        "raise",
+        "reraise",
+    }:
         return 1.5
     return 0.25
 
@@ -495,13 +685,20 @@ def _position(seat: object, button_seat: object) -> str:
     return "button" if str(seat) == str(button_seat) else "blind"
 
 
-def _size_bucket(action: Mapping[str, object], pot: int) -> str:
+def _size_bucket(
+    action: Mapping[str, object], pot: int, prior_round_total: int = 0
+) -> str:
+    """Bucket a round-total wager by its increment over the pot before it."""
+
     if action.get("action") not in {"bet", "raise"}:
         return "none"
     amount = _integer(action.get("amount"))
     if amount is None or amount <= 0:
         return "unknown"
-    fraction = amount / max(1, pot)
+    increment = amount - max(0, prior_round_total)
+    if increment <= 0:
+        return "unknown"
+    fraction = increment / max(1, pot)
     if fraction <= 0.35:
         return "small"
     if fraction <= 0.80:

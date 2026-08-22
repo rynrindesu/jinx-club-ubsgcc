@@ -17,9 +17,23 @@ Action = dict[str, Any]
 class RiskContext:
     delta: int
     hands_remaining: int
+    future_blinds: int
+    coast_floor: int
+    target_gap: int
     secure_current_hand: bool
-    protect: bool
-    desperate: bool
+    tier: str
+    call_caution: float
+    open_adjustment: float
+    value_adjustment: float
+    continuation_floor: float
+
+    @property
+    def chasing(self) -> bool:
+        return self.tier == "chase"
+
+    @property
+    def guarded(self) -> bool:
+        return self.tier == "guarded"
 
 
 class Phase2Engine:
@@ -102,7 +116,6 @@ def _pre_reveal_move(
             is_button
             and not actions
             and "call" in _legal_actions(payload)
-            and not risk.protect
         ):
             return {"action": "call"}
         if (
@@ -111,7 +124,8 @@ def _pre_reveal_move(
                 or _unknown_medium_probe(payload, to_call, big_blind)
             )
             and to_call < stack
-            and not risk.protect
+            and not risk.guarded
+            and (not profile.aggressive or to_call <= big_blind)
         ):
             return _fallback(payload, "call")
         return _fallback(payload, "fold")
@@ -124,14 +138,15 @@ def _pre_reveal_move(
         if to_call == 0:
             return _fallback(payload, "check")
         if (
-            not risk.protect
-            and to_call < stack
+            to_call < stack
             and _partial_call_allowed(
                 payload=payload,
                 to_call=to_call,
                 pot=pot,
                 big_blind=big_blind,
                 estimate=estimate,
+                profile=profile,
+                risk=risk,
                 post_reveal=False,
             )
         ):
@@ -142,11 +157,11 @@ def _pre_reveal_move(
     if profile.passive:
         margin += 0.025
     if profile.aggressive:
-        margin -= 0.02
-    if risk.protect:
-        margin += 0.10
-    if risk.desperate:
-        margin -= 0.035
+        # Raw aggression is pressure, not evidence of bluffing.  Any explicit
+        # weak range learned from shown hands is already reflected in the
+        # equity estimate, so the generic adjustment must remain cautious.
+        margin += 0.025
+    margin += risk.call_caution
 
     conservative = estimate.mean - 0.20 * estimate.disagreement
 
@@ -156,10 +171,7 @@ def _pre_reveal_move(
             open_threshold = 0.22
         elif profile.calling_station:
             open_threshold = 0.42
-        if risk.protect:
-            open_threshold += 0.08
-        if risk.desperate:
-            open_threshold -= 0.04
+        open_threshold += risk.open_adjustment
 
         # Once this opponent has punished an open, only open hands that also
         # clear the continuation threshold.  Against general aggression use a
@@ -170,6 +182,10 @@ def _pre_reveal_move(
             commitment_threshold = max(commitment_threshold, 0.80)
         elif profile.aggressive:
             commitment_threshold = max(commitment_threshold, 0.62)
+        if risk.continuation_floor > 0:
+            commitment_threshold = max(
+                commitment_threshold, risk.continuation_floor
+            )
 
         if conservative >= commitment_threshold:
             target = 5 if profile.calling_station else 4
@@ -177,23 +193,39 @@ def _pre_reveal_move(
         if (
             "call" in _legal_actions(payload)
             and estimate.mean >= 0.24
-            and not risk.protect
         ):
             return {"action": "call"}
         return _fallback(payload, "fold")
 
     if to_call == 0:
-        if conservative >= 0.67 + margin and not risk.protect:
+        free_raise_threshold = 0.67 + margin
+        if risk.continuation_floor > 0:
+            free_raise_threshold = max(
+                free_raise_threshold, risk.continuation_floor
+            )
+        if conservative >= free_raise_threshold:
             return _fixed_wager(payload, 5, fallback="check")
         return _fallback(payload, "check")
 
     pot_odds = to_call / max(1, pot + to_call)
     facing_reraise = _we_wagered_this_round(payload)
-    reraise_floor = 0.90 if risk.protect else 0.80
+    reraise_floor = max(0.80, risk.continuation_floor)
     required = max(
         pot_odds + margin,
         reraise_floor if facing_reraise else 0.45,
     )
+    if not facing_reraise:
+        required = max(
+            required,
+            _planned_two_street_requirement(
+                payload=payload,
+                to_call=to_call,
+                pot=pot,
+                stack=stack,
+                profile=profile,
+                risk=risk,
+            ),
+        )
     if not _call_exposure_allowed(
         payload=payload,
         to_call=to_call,
@@ -234,7 +266,8 @@ def _post_reveal_move(
                 or _unknown_medium_probe(payload, to_call, big_blind)
             )
             and to_call < stack
-            and not risk.protect
+            and not risk.guarded
+            and (not profile.aggressive or to_call <= big_blind)
         ):
             return _fallback(payload, "call")
         return _fallback(payload, "fold")
@@ -243,14 +276,15 @@ def _post_reveal_move(
         if to_call == 0:
             return _fallback(payload, "check")
         if (
-            not risk.protect
-            and to_call < stack
+            to_call < stack
             and _partial_call_allowed(
                 payload=payload,
                 to_call=to_call,
                 pot=pot,
                 big_blind=big_blind,
                 estimate=estimate,
+                profile=profile,
+                risk=risk,
                 post_reveal=True,
             )
         ):
@@ -258,15 +292,14 @@ def _post_reveal_move(
         return _fallback(payload, "fold")
 
     conservative = estimate.mean - 0.15 * estimate.disagreement
-    call_adjustment = 0.0
+    call_adjustment = risk.call_caution
     if profile.aggressive:
-        call_adjustment -= 0.035
+        # Aggression alone is not a bluff posterior.  A demonstrated weak
+        # betting range raises `estimate.mean`; absent that evidence, require
+        # more equity rather than rewarding the opponent's pressure.
+        call_adjustment += 0.035
     if profile.passive:
         call_adjustment += 0.04
-    if risk.protect:
-        call_adjustment += 0.12
-    if risk.desperate:
-        call_adjustment -= 0.04
 
     if to_call > 0:
         pot_odds = to_call / max(1, pot + to_call)
@@ -275,7 +308,11 @@ def _post_reveal_move(
         if fresh_fraction > 1.0:
             required = max(required, 0.72)
         if _we_wagered_this_round(payload):
-            required = max(required, 0.78)
+            required = max(
+                required,
+                0.78,
+                risk.continuation_floor,
+            )
 
         if not _call_exposure_allowed(
             payload=payload,
@@ -292,13 +329,13 @@ def _post_reveal_move(
                 "raise" in _legal_actions(payload)
                 and conservative >= 0.89
                 and estimate.confidence == "learned"
-                and not risk.protect
+                and conservative >= risk.continuation_floor
             ):
                 return _pot_wager(
                     payload,
                     "raise",
                     0.55,
-                    allow_all_in=risk.desperate and conservative >= 0.94,
+                    allow_all_in=risk.chasing and conservative >= 0.94,
                     fallback="call",
                 )
             return _fallback(payload, "call")
@@ -314,10 +351,7 @@ def _post_reveal_move(
         value_threshold -= 0.05
     elif profile.passive:
         value_threshold -= 0.02
-    if risk.protect:
-        value_threshold += 0.08
-    if risk.desperate:
-        value_threshold -= 0.04
+    value_threshold += risk.value_adjustment
     # A value bet is only coherent if the same hand can continue against the
     # response this opponent has already shown.  Checking retains all equity
     # and removes the repeated bet-five/fold-to-twenty-one loss.
@@ -325,10 +359,12 @@ def _post_reveal_move(
         value_threshold = max(value_threshold, 0.78)
     elif profile.aggressive:
         value_threshold = max(value_threshold, 0.68)
+    if risk.continuation_floor > 0:
+        value_threshold = max(value_threshold, risk.continuation_floor)
     if conservative >= value_threshold:
         fraction = 0.65 if profile.calling_station else 0.50
         if (
-            risk.desperate
+            risk.chasing
             and conservative >= 0.72
         ):
             fraction = 0.75
@@ -337,7 +373,7 @@ def _post_reveal_move(
             wager_action,
             fraction,
             allow_all_in=(
-                risk.desperate
+                risk.chasing
                 and conservative >= 0.94
             ),
             fallback="check",
@@ -351,7 +387,7 @@ def _post_reveal_move(
         and estimate.mean <= 0.20
         and profile.post_responses >= 4
         and profile.post_fold_rate > 0.48
-        and not risk.protect
+        and not risk.guarded
         and _opponent_checked_this_round(payload)
     ):
         addition = _planned_wager_addition(payload, 1 / 3)
@@ -379,17 +415,61 @@ def _risk_context(payload: Mapping[str, Any]) -> RiskContext:
     future_blinds = _future_forced_bets(payload, remaining - 1)
     coast_floor = delta - committed - future_blinds
     secure_current = coast_floor >= 25
-    protect = secure_current or (remaining <= 12 and delta >= 25)
-    desperate = (
-        (remaining <= 6 and delta < 20)
-        or (remaining <= 3 and delta < 24)
-    ) and not protect
+    target_gap = max(0, 25 - coast_floor)
+
+    # The threshold creates four useful non-terminal states.  A late lead is
+    # guarded, not frozen: strong hands still play when future blinds mean that
+    # folding everything cannot score.  A deficit is pressed or chased through
+    # response-consistent value lines; calls never become looser merely because
+    # the clock is short.
+    if secure_current:
+        tier = "coast"
+    elif remaining <= 12 and delta >= 25:
+        tier = "guarded"
+    elif remaining <= 8 and target_gap >= 2 * remaining:
+        tier = "chase"
+    elif remaining <= 8 and target_gap > 0:
+        tier = "press"
+    else:
+        tier = "normal"
+
+    call_caution = {
+        "coast": 1.0,
+        "guarded": 0.04,
+        "normal": 0.0,
+        "press": 0.01,
+        "chase": 0.02,
+    }[tier]
+    open_adjustment = {
+        "coast": 1.0,
+        "guarded": 0.04,
+        "normal": 0.0,
+        "press": -0.02,
+        "chase": -0.04,
+    }[tier]
+    value_adjustment = open_adjustment
+    continuation_floor = {
+        "coast": 1.0,
+        # Scouted higher-family card 12 has a robust pre-reveal estimate just
+        # above 0.82.  This keeps that response-ready open while filtering the
+        # middling hands that created protection folds on the next action.
+        "guarded": 0.82,
+        "normal": 0.0,
+        "press": 0.72,
+        "chase": 0.68,
+    }[tier]
     return RiskContext(
         delta=delta,
         hands_remaining=remaining,
+        future_blinds=future_blinds,
+        coast_floor=coast_floor,
+        target_gap=target_gap,
         secure_current_hand=secure_current,
-        protect=protect,
-        desperate=desperate,
+        tier=tier,
+        call_caution=call_caution,
+        open_adjustment=open_adjustment,
+        value_adjustment=value_adjustment,
+        continuation_floor=continuation_floor,
     )
 
 
@@ -400,6 +480,8 @@ def _partial_call_allowed(
     pot: int,
     big_blind: int,
     estimate: EquityEstimate,
+    profile: OpponentProfile,
+    risk: RiskContext,
     post_reveal: bool,
 ) -> bool:
     """Buy partial-rule showdowns only when discovery or equity pays for it."""
@@ -412,20 +494,21 @@ def _partial_call_allowed(
         return False
 
     pot_odds = to_call / max(1, pot + to_call)
+    caution = risk.call_caution + (0.03 if profile.aggressive else 0.0)
     if discovery:
         # Early evidence has genuine information value, but even then do not
         # pay when every live rule says the hand is already drawing dead.
         information_credit = 0.10 if post_reveal else 0.06
-        return estimate.upper + information_credit >= pot_odds
+        return estimate.upper + information_credit >= pot_odds + caution
 
     disagreement_penalty = 0.20 if post_reveal else 0.25
     conservative = estimate.mean - disagreement_penalty * estimate.disagreement
     if post_reveal:
-        return conservative >= pot_odds + 0.04
+        return conservative >= pot_odds + 0.04 + caution
 
     # A pre-reveal call can still face another betting decision, so require a
     # real strength edge rather than paying only to observe the community.
-    return conservative >= max(0.58, pot_odds + 0.10)
+    return conservative >= max(0.58 + caution, pot_odds + 0.10 + caution)
 
 
 def _cheap_calibration_allowed(
@@ -466,6 +549,48 @@ def _calibration_exposure_cap(
     return max(2 * big_blind, round(0.04 * starting_stack))
 
 
+def _planned_two_street_requirement(
+    *,
+    payload: Mapping[str, Any],
+    to_call: int,
+    pot: int,
+    stack: int,
+    profile: OpponentProfile,
+    risk: RiskContext,
+) -> float:
+    """Price a recurring pre-raise plus post-reveal continuation as one line.
+
+    The Phase 2 opponent repeatedly raises to five and then bets seven.  Looking
+    only at the first three-chip call makes middling hands appear cheap even
+    though they predictably face another seven chips after the reveal.  Treat
+    an opening total of at least five as planning to continue for roughly one
+    more big blind above that total; strong hands enter, marginal hands do not.
+    """
+
+    if payload.get("round") != "pre_reveal" or _we_wagered_this_round(payload):
+        return 0.0
+    raise_total = _latest_opponent_raise_total(payload)
+    big_blind = max(1, _integer(payload.get("big_blind"), 2))
+    if raise_total is None or raise_total < 2 * big_blind + 1:
+        return 0.0
+
+    planned_post_call = raise_total + big_blind
+    planned_cost = to_call + planned_post_call
+    final_pot = pot + to_call + 2 * planned_post_call
+    planned_odds = planned_cost / max(1, final_pot)
+
+    # The extra ten points account for entering a range that will face a
+    # strength-conditioned second barrel, not a fresh uniformly random hand.
+    entry_floor = 0.60 + risk.call_caution
+    if profile.aggressive:
+        entry_floor += 0.04
+    elif profile.passive:
+        entry_floor -= 0.03
+    if planned_cost >= stack:
+        entry_floor = max(entry_floor, 0.94)
+    return max(entry_floor, planned_odds + 0.10 + risk.call_caution)
+
+
 def _call_exposure_allowed(
     *,
     payload: Mapping[str, Any],
@@ -484,10 +609,14 @@ def _call_exposure_allowed(
         return proven_nuts
     if to_call / max(1, stack) >= 0.35 and conservative < 0.90:
         return False
-    current_commitment = _current_hand_commitment(payload)
-    score_cushion = max(0, risk.delta - 25 - current_commitment)
-    if risk.protect and to_call > score_cushion and not proven_nuts:
-        return False
+    # A guarded lead is not yet a coast: future blinds can still consume it.
+    # Permit a strong response within the chips needed to close the target gap,
+    # and demand progressively more certainty only beyond that gap.
+    if risk.guarded and to_call > max(2, risk.target_gap):
+        excess = to_call - risk.target_gap
+        required = min(0.94, risk.continuation_floor + 0.01 * excess)
+        if conservative < required and not proven_nuts:
+            return False
     return True
 
 
@@ -618,6 +747,19 @@ def _we_wagered_this_round(payload: Mapping[str, Any]) -> bool:
         and action.get("action") in {"bet", "raise"}
         for action in _round_actions(payload)
     )
+
+
+def _latest_opponent_raise_total(payload: Mapping[str, Any]) -> int | None:
+    your_seat = payload.get("your_seat")
+    for action in reversed(_round_actions(payload, "pre_reveal")):
+        if (
+            str(action.get("seat")) != str(your_seat)
+            and action.get("action") == "raise"
+        ):
+            amount = _optional_integer(action.get("amount"))
+            if amount is not None and amount >= 0:
+                return amount
+    return None
 
 
 def _opponent_checked_this_round(payload: Mapping[str, Any]) -> bool:

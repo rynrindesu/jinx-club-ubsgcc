@@ -43,6 +43,7 @@ class ShowdownObservation:
     first_number: int
     second_number: int
     outcome: Outcome
+    is_baseline: bool = False
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,7 @@ class RuleKnowledge:
         init=False, default=None, repr=False
     )
     _agreement_cache: float = field(init=False, default=0.0, repr=False)
+    _candidate_exhausted: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self.active_candidates = set(range(len(self.candidates)))
@@ -144,7 +146,7 @@ class RuleKnowledge:
             )
         ] = -observation.outcome
 
-        self.active_candidates = {
+        surviving = {
             index
             for index in self.active_candidates
             if self.candidates[index].compare(
@@ -154,8 +156,83 @@ class RuleKnowledge:
             )
             == observation.outcome
         }
+        if surviving:
+            self.active_candidates = surviving
+            self._candidate_exhausted = False
+        elif self.active_candidates or self._candidate_exhausted:
+            # Filtering an already-empty set can never recover.  Re-evaluate
+            # the whole library so live evidence can supersede a stale
+            # baseline while retaining both in the observation history.
+            self.active_candidates = self._recomputed_candidates()
+            self._candidate_exhausted = not self.active_candidates
         self._agreement_cache_key = None
         return True
+
+    def _recomputed_candidates(self) -> set[int]:
+        """Rebuild candidates, giving live evidence priority over baselines."""
+
+        if not self.candidates:
+            return set()
+        live = [
+            observation
+            for observation in self.observations
+            if not observation.is_baseline
+        ]
+        baselines = [
+            observation
+            for observation in self.observations
+            if observation.is_baseline
+        ]
+        pool = self._matching_candidates(live)
+        if live and not pool:
+            # Contradictory live showdowns are not safe to smooth away.
+            return set()
+
+        exact = self._matching_candidates(baselines, pool)
+        if exact or not baselines:
+            return exact
+
+        # Baselines are scouting priors, not authority over a current
+        # showdown.  If they conflict, keep the live-compatible candidates
+        # contradicted by the fewest baseline comparisons.
+        contradiction_counts = {
+            index: sum(
+                self.candidates[index].compare(
+                    observation.first_number,
+                    observation.second_number,
+                    observation.community,
+                )
+                != observation.outcome
+                for observation in baselines
+            )
+            for index in pool
+        }
+        fewest = min(contradiction_counts.values())
+        return {
+            index
+            for index, count in contradiction_counts.items()
+            if count == fewest
+        }
+
+    def _matching_candidates(
+        self,
+        observations: Sequence[ShowdownObservation],
+        pool: Iterable[int] | None = None,
+    ) -> set[int]:
+        indices = range(len(self.candidates)) if pool is None else pool
+        return {
+            index
+            for index in indices
+            if all(
+                self.candidates[index].compare(
+                    observation.first_number,
+                    observation.second_number,
+                    observation.community,
+                )
+                == observation.outcome
+                for observation in observations
+            )
+        }
 
     def estimate(
         self,
@@ -339,6 +416,10 @@ def build_candidate_rules() -> tuple[RuleCandidate, ...]:
         ("higher", (("number", 1),)),
         ("lower", (("number", -1),)),
         ("pair_then_higher", (("pair", 1), ("number", 1))),
+        (
+            "pair_then_seven_then_higher",
+            (("pair", 1), ("private_seven", 1), ("number", 1)),
+        ),
         ("pair_then_lower", (("pair", 1), ("number", -1))),
         ("pair_loses_then_higher", (("pair", -1), ("number", 1))),
         ("pair_loses_then_lower", (("pair", -1), ("number", -1))),
@@ -470,7 +551,11 @@ def extract_observations(
                     # In a later multiway phase two losing seats reveal no
                     # ordering relative to one another.
                     continue
-                outcome = 0
+                outcome = _shared_winner_outcome(
+                    hand, hero_key, opponent_key
+                )
+                if outcome is None:
+                    continue
             else:
                 outcome = 1 if hero_won else -1
             observations.append(
@@ -493,6 +578,7 @@ def _feature(name: str, number: int, community: int) -> int:
     features = {
         "number": number,
         "pair": int(number == community),
+        "private_seven": int(number == 7),
         "distance": abs(number - community),
         "clockwise": (number - community) % 13,
         "counterclockwise": (community - number) % 13,
@@ -575,3 +661,174 @@ def _integer(value: object) -> int | None:
         return int(value)  # type: ignore[arg-type]
     except (TypeError, ValueError, OverflowError):
         return None
+
+
+def _shared_winner_outcome(
+    hand: Mapping[str, object], hero_key: str, opponent_key: str
+) -> Outcome | None:
+    """Resolve two listed winners without mistaking a refund for a tie."""
+
+    deltas, has_delta_data = _seat_values(
+        hand,
+        mapping_fields=("deltas", "chip_deltas"),
+        player_fields=("delta", "chip_delta", "net_delta"),
+    )
+    if has_delta_data:
+        hero_delta = deltas.get(hero_key)
+        opponent_delta = deltas.get(opponent_key)
+        if hero_delta is None or opponent_delta is None:
+            return None
+        if hero_delta > 0 > opponent_delta:
+            return 1
+        if hero_delta < 0 < opponent_delta:
+            return -1
+        if hero_delta == opponent_delta:
+            return 0
+        return None
+
+    contributions, has_contribution_data = _seat_values(
+        hand,
+        mapping_fields=(
+            "contributions",
+            "total_contributions",
+            "committed",
+        ),
+        player_fields=(
+            "contribution",
+            "contributed",
+            "committed",
+            "total_bet",
+        ),
+    )
+    if has_contribution_data:
+        hero_contribution = contributions.get(hero_key)
+        opponent_contribution = contributions.get(opponent_key)
+        if hero_contribution is None or opponent_contribution is None:
+            return None
+        return 0 if hero_contribution == opponent_contribution else None
+
+    if _has_unequal_exposure_signal(hand, hero_key, opponent_key):
+        return None
+    # Preserve ordinary showdown compatibility: with no refund, all-in, or
+    # unequal-contribution signal, two listed winners represent a split pot.
+    return 0
+
+
+def _seat_values(
+    hand: Mapping[str, object],
+    *,
+    mapping_fields: Sequence[str],
+    player_fields: Sequence[str],
+) -> tuple[dict[str, int], bool]:
+    """Read per-seat integers from replay mappings or player records."""
+
+    values: dict[str, int] = {}
+    present = False
+    for field in mapping_fields:
+        raw_values = hand.get(field)
+        if raw_values is None:
+            continue
+        present = True
+        if not isinstance(raw_values, Mapping):
+            continue
+        for seat, raw_value in raw_values.items():
+            parsed = _integer(raw_value)
+            if parsed is not None:
+                values.setdefault(str(seat), parsed)
+
+    players = hand.get("players")
+    if isinstance(players, Sequence) and not isinstance(players, (str, bytes)):
+        for player in players:
+            if not isinstance(player, Mapping) or "seat" not in player:
+                continue
+            for field in player_fields:
+                if field not in player:
+                    continue
+                present = True
+                parsed = _integer(player.get(field))
+                if parsed is not None:
+                    values.setdefault(str(player.get("seat")), parsed)
+                    break
+    elif isinstance(players, Mapping):
+        for seat, player in players.items():
+            if not isinstance(player, Mapping):
+                continue
+            for field in player_fields:
+                if field not in player:
+                    continue
+                present = True
+                parsed = _integer(player.get(field))
+                if parsed is not None:
+                    values.setdefault(str(seat), parsed)
+                    break
+    return values, present
+
+
+def _has_unequal_exposure_signal(
+    hand: Mapping[str, object], hero_key: str, opponent_key: str
+) -> bool:
+    """Return whether an apparent split pot may include an uncalled refund."""
+
+    for field in (
+        "side_pots",
+        "side_pot",
+        "refunds",
+        "refund",
+        "uncalled_bets",
+        "uncalled_amount",
+    ):
+        value = hand.get(field)
+        if value not in (None, False, 0, (), [], {}):
+            return True
+    if any(
+        hand.get(field) not in (None, False, 0, (), [], {})
+        for field in ("all_in", "all_in_seats")
+    ):
+        return True
+
+    players = hand.get("players")
+    player_records: Iterable[object]
+    if isinstance(players, Mapping):
+        player_records = players.values()
+    elif isinstance(players, Sequence) and not isinstance(players, (str, bytes)):
+        player_records = players
+    else:
+        player_records = ()
+    if any(
+        isinstance(player, Mapping)
+        and (player.get("all_in") is True or player.get("is_all_in") is True)
+        for player in player_records
+    ):
+        return True
+
+    actions = hand.get("actions")
+    if not isinstance(actions, Sequence) or isinstance(actions, (str, bytes)):
+        return False
+    round_amounts: dict[str, dict[str, int]] = {}
+    for action in actions:
+        if not isinstance(action, Mapping):
+            continue
+        name = str(action.get("action", "")).lower()
+        if (
+            action.get("all_in") is True
+            or action.get("is_all_in") is True
+            or "all_in" in name
+            or "all-in" in name
+            or "refund" in name
+            or "uncalled" in name
+            or "return" in name
+        ):
+            return True
+        seat = str(action.get("seat"))
+        amount = _integer(action.get("amount"))
+        if seat not in {hero_key, opponent_key} or amount is None:
+            continue
+        round_key = str(action.get("round", ""))
+        amounts = round_amounts.setdefault(round_key, {})
+        amounts[seat] = max(amount, amounts.get(seat, amount))
+    return any(
+        hero_key in amounts
+        and opponent_key in amounts
+        and amounts[hero_key] != amounts[opponent_key]
+        for amounts in round_amounts.values()
+    )

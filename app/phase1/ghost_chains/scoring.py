@@ -20,7 +20,7 @@ class ScoreConfig:
     walk_discount: float = 0.45
     convergence_weight: float = 2.0
     convergence_scale: float = 4.0
-    open_route_capacity: float = 2.0
+    open_route_capacity: float = 4.0
     shortest_path_weight: float = 4.0
     closed_route_weight: float = 14.0
     risk_half_saturation: float = 8.0
@@ -92,6 +92,10 @@ class StructuralScore:
 class _RouteState:
     connectivity: Mapping[tuple[str, str], float]
     shortest_distances: Mapping[tuple[str, str], int]
+    shortest_confidences: Mapping[tuple[str, str], float]
+    shortest_completion_keys: Mapping[
+        tuple[str, str], tuple[datetime, int]
+    ]
     direct_pairs: frozenset[tuple[str, str]]
 
 
@@ -133,6 +137,12 @@ class DiscountedWalkScorer:
         temporal_after = self._temporal_route_state((*relevant, candidate))
 
         topology = self._state_delta(candidate, topology_before, topology_after)
+        topology = self._apply_long_return_floor(
+            candidate,
+            relevant,
+            topology_before,
+            topology,
+        )
         temporal = self._state_delta(candidate, temporal_before, temporal_after)
         config = self.config
         raw = math.fsum(
@@ -197,8 +207,32 @@ class DiscountedWalkScorer:
             before_distance = before.shortest_distances.get(pair)
             if before_distance is None or after_distance >= before_distance:
                 continue
+            confidence = min(
+                before.shortest_confidences.get(pair, 1.0),
+                after.shortest_confidences.get(pair, 1.0),
+            )
+            completion_key = before.shortest_completion_keys.get(pair)
+            if completion_key is not None:
+                candidate_key = candidate.created_at, candidate.sequence
+                if completion_key >= candidate_key:
+                    # A late-arriving edge cannot retroactively shorten a route
+                    # that had not completed at the candidate's event time.
+                    confidence = 0.0
+                else:
+                    gap = max(
+                        0.0,
+                        (
+                            candidate.created_at - completion_key[0]
+                        ).total_seconds(),
+                    )
+                    confidence *= math.exp(
+                        -math.log(2.0)
+                        * gap
+                        / self.config.temporal_half_life_seconds
+                    )
             shortest_path_deltas.append(
-                (1.0 / after_distance) - (1.0 / before_distance)
+                ((1.0 / after_distance) - (1.0 / before_distance))
+                * confidence
             )
 
         open_delta = math.fsum(open_deltas)
@@ -220,6 +254,52 @@ class DiscountedWalkScorer:
             raw=raw,
             open_route_delta=non_closed_delta,
             closed_route_delta=closed_delta,
+        )
+
+    def _apply_long_return_floor(
+        self,
+        candidate: TemporalEdge,
+        relevant: tuple[TemporalEdge, ...],
+        before: _RouteState,
+        score: StructuralScore,
+    ) -> StructuralScore:
+        """Keep a real return visible when bounded route enumeration misses it.
+
+        Simple-route enumeration is deliberately bounded for predictable
+        streaming cost. Reachability itself is cheap, however, and a return
+        path must not become an ordinary extension merely because it is one
+        hop longer than that safety bound.
+        """
+
+        pair = candidate.sender, candidate.recipient
+        if pair in before.direct_pairs:
+            return score
+
+        adjacency = self._adjacency(relevant)
+        return_distance = self._shortest_distance(
+            candidate.recipient,
+            candidate.sender,
+            adjacency,
+        )
+        if return_distance is None:
+            return score
+
+        cycle_length = return_distance + 1
+        closed_floor = 1.0 / cycle_length
+        if score.closed_route_delta >= closed_floor:
+            return score
+
+        raw = max(
+            0.0,
+            score.raw
+            + self.config.closed_route_weight
+            * (closed_floor - score.closed_route_delta),
+        )
+        return StructuralScore(
+            risk=self._risk(raw),
+            raw=raw,
+            open_route_delta=score.open_route_delta,
+            closed_route_delta=closed_floor,
         )
 
     def _self_transfer_score(self) -> StructuralScore:
@@ -271,48 +351,63 @@ class DiscountedWalkScorer:
         self,
         events: Iterable[TemporalEdge],
     ) -> _RouteState:
-        """Enumerate bounded simple routes in the binary active graph."""
+        """Calculate bounded discounted-walk capacity in the active graph.
 
-        adjacency: defaultdict[str, set[str]] = defaultdict(set)
+        This is the sparse equivalent of ``A + a*A^2 + ...``. Unlike capped
+        path-signature enumeration, its result cannot depend on entity sort
+        order, and cycles contribute the repeated-flow capacity that makes
+        them structurally distinct from an acyclic route.
+        """
+
+        materialized = tuple(events)
+        adjacency = self._adjacency(materialized)
         nodes: set[str] = set()
-        for event in events:
+        for event in materialized:
             if event.sender == event.recipient:
                 continue
-            adjacency[event.sender].add(event.recipient)
             nodes.add(event.sender)
             nodes.add(event.recipient)
 
-        signatures: set[tuple[str, ...]] = set()
-        closed_signatures: set[tuple[str, ...]] = set()
+        connectivity: defaultdict[tuple[str, str], float] = defaultdict(float)
         for source in sorted(nodes):
-            stack = [(source, (source,))]
-            while stack and (
-                len(signatures) + len(closed_signatures)
-                < self.config.max_route_signatures
-            ):
-                node, route = stack.pop()
-                if len(route) - 1 >= self.config.max_walk_length:
-                    continue
-                for recipient in sorted(adjacency.get(node, ()), reverse=True):
-                    if recipient == source and len(route) > 1:
-                        closed_signatures.add(
-                            self._canonical_cycle((*route, source))
-                        )
-                        continue
-                    if recipient in route:
-                        continue
-                    extended = (*route, recipient)
-                    signatures.add(extended)
-                    stack.append((recipient, extended))
+            frontier: dict[str, int] = {source: 1}
+            discount = 1.0
+            for _ in range(self.config.max_walk_length):
+                next_frontier: defaultdict[str, int] = defaultdict(int)
+                for node, walk_count in frontier.items():
+                    for recipient in adjacency.get(node, ()):
+                        next_frontier[recipient] += walk_count
+                if not next_frontier:
+                    break
+                for recipient, walk_count in next_frontier.items():
+                    connectivity[(source, recipient)] += discount * walk_count
+                frontier = dict(next_frontier)
+                discount *= self.config.walk_discount
 
-        signatures.update(closed_signatures)
-        return self._state_from_signatures(signatures)
+        shortest_distances = self._all_pair_shortest_distances(adjacency, nodes)
+        return _RouteState(
+            connectivity=dict(connectivity),
+            shortest_distances=shortest_distances,
+            shortest_confidences={
+                pair: 1.0 for pair in shortest_distances
+            },
+            shortest_completion_keys={},
+            direct_pairs=frozenset(
+                (sender, recipient)
+                for sender, recipients in adjacency.items()
+                for recipient in recipients
+            ),
+        )
 
     def _temporal_route_state(self, events: Iterable[TemporalEdge]) -> _RouteState:
         """Enumerate distinct simple entity routes in strict temporal order."""
 
         signatures: set[tuple[str, ...]] = set()
+        inferred_signature_count = 0
         route_factors: dict[tuple[str, ...], float] = {}
+        route_completion_keys: dict[
+            tuple[str, ...], tuple[datetime, int]
+        ] = {}
         routes_ending_at: defaultdict[
             str, dict[tuple[str, ...], datetime]
         ] = defaultdict(dict)
@@ -330,9 +425,13 @@ class DiscountedWalkScorer:
                 continue
 
             additions = {(event.sender, event.recipient): event.created_at}
-            for route, started_at in sorted(
-                routes_ending_at.get(event.sender, {}).items()
-            ):
+            # Dict insertion order is induced by transaction sequence. Keeping
+            # that order makes the safety cap invariant to arbitrary entity
+            # spelling; lexical route order would retain different hypotheses
+            # after an identifier-only rename.
+            for route, started_at in routes_ending_at.get(
+                event.sender, {}
+            ).items():
                 route_length = len(route) - 1
                 if route_length >= self.config.max_walk_length:
                     continue
@@ -342,12 +441,17 @@ class DiscountedWalkScorer:
                     continue
                 additions[(*route, event.recipient)] = started_at
 
-            for route, started_at in sorted(additions.items()):
+            for route, started_at in additions.items():
+                is_observed_edge = len(route) == 2
                 if (
                     route not in signatures
-                    and len(signatures) >= self.config.max_route_signatures
+                    and not is_observed_edge
+                    and inferred_signature_count
+                    >= self.config.max_route_signatures
                 ):
                     continue
+                if route not in signatures and not is_observed_edge:
+                    inferred_signature_count += 1
                 signatures.add(route)
                 span = max(0.0, (event.created_at - started_at).total_seconds())
                 factor = math.exp(
@@ -355,37 +459,96 @@ class DiscountedWalkScorer:
                     * span
                     / self.config.temporal_half_life_seconds
                 )
-                route_factors[route] = max(route_factors.get(route, 0.0), factor)
+                completion_key = event.created_at, event.sequence
+                previous_factor = route_factors.get(route)
+                if (
+                    previous_factor is None
+                    or factor > previous_factor
+                    or (
+                        factor == previous_factor
+                        and completion_key
+                        > route_completion_keys.get(route, completion_key)
+                    )
+                ):
+                    route_factors[route] = factor
+                    route_completion_keys[route] = completion_key
                 if route[0] == route[-1]:
                     continue
                 previous_start = routes_ending_at[route[-1]].get(route)
                 if previous_start is None or started_at > previous_start:
                     routes_ending_at[route[-1]][route] = started_at
 
-        return self._state_from_signatures(signatures, route_factors)
+        return self._state_from_signatures(
+            signatures,
+            route_factors,
+            route_completion_keys,
+        )
 
     def _state_from_signatures(
         self,
         signatures: Iterable[tuple[str, ...]],
         route_factors: Mapping[tuple[str, ...], float] | None = None,
+        route_completion_keys: Mapping[
+            tuple[str, ...], tuple[datetime, int]
+        ]
+        | None = None,
     ) -> _RouteState:
         route_weights: defaultdict[tuple[str, str], list[float]] = defaultdict(list)
         shortest_distances: dict[tuple[str, str], int] = {}
+        shortest_confidences: dict[tuple[str, str], float] = {}
+        shortest_completion_keys: dict[
+            tuple[str, str], tuple[datetime, int]
+        ] = {}
         direct_pairs: set[tuple[str, str]] = set()
         for route in sorted(signatures):
             length = len(route) - 1
             pair = route[0], route[-1]
+            factor = 1.0
+            if route_factors is not None:
+                factor = route_factors.get(route, 0.0)
             weight = (
                 1.0 / length
                 if pair[0] == pair[1]
                 else self.config.walk_discount ** (length - 1)
             )
-            if route_factors is not None:
-                weight *= route_factors.get(route, 0.0)
+            weight *= factor
+
+            if pair[0] == pair[1]:
+                # A time-respecting cycle has one real chronological start.
+                # Rotating it would imply a different (usually impossible)
+                # ordering of the same events.
+                route_weights[pair].append(weight)
+                continue
+
             route_weights[pair].append(weight)
             previous_distance = shortest_distances.get(pair)
+            completion_key = (
+                route_completion_keys.get(route)
+                if route_completion_keys is not None
+                else None
+            )
             if previous_distance is None or length < previous_distance:
                 shortest_distances[pair] = length
+                shortest_confidences[pair] = factor
+                if completion_key is not None:
+                    shortest_completion_keys[pair] = completion_key
+            elif length == previous_distance:
+                previous_confidence = shortest_confidences.get(pair, 0.0)
+                previous_completion = shortest_completion_keys.get(pair)
+                if (
+                    factor > previous_confidence
+                    or (
+                        factor == previous_confidence
+                        and completion_key is not None
+                        and (
+                            previous_completion is None
+                            or completion_key > previous_completion
+                        )
+                    )
+                ):
+                    shortest_confidences[pair] = factor
+                    if completion_key is not None:
+                        shortest_completion_keys[pair] = completion_key
             if length == 1:
                 direct_pairs.add(pair)
 
@@ -395,17 +558,68 @@ class DiscountedWalkScorer:
         return _RouteState(
             connectivity=connectivity,
             shortest_distances=shortest_distances,
+            shortest_confidences=shortest_confidences,
+            shortest_completion_keys=shortest_completion_keys,
             direct_pairs=frozenset(direct_pairs),
         )
 
     @staticmethod
-    def _canonical_cycle(route: tuple[str, ...]) -> tuple[str, ...]:
-        """Deduplicate rotations of one directed simple cycle."""
+    def _adjacency(
+        events: Iterable[TemporalEdge],
+    ) -> dict[str, set[str]]:
+        adjacency: defaultdict[str, set[str]] = defaultdict(set)
+        for event in events:
+            if event.sender != event.recipient:
+                adjacency[event.sender].add(event.recipient)
+        return dict(adjacency)
 
-        body = route[:-1]
-        rotations = tuple(body[index:] + body[:index] for index in range(len(body)))
-        canonical = min(rotations)
-        return (*canonical, canonical[0])
+    @classmethod
+    def _all_pair_shortest_distances(
+        cls,
+        adjacency: Mapping[str, AbstractSet[str]],
+        nodes: AbstractSet[str],
+    ) -> dict[tuple[str, str], int]:
+        distances: dict[tuple[str, str], int] = {}
+        for source in sorted(nodes):
+            frontier = {source}
+            visited = {source}
+            distance = 0
+            while frontier:
+                distance += 1
+                frontier = {
+                    recipient
+                    for node in frontier
+                    for recipient in adjacency.get(node, ())
+                    if recipient not in visited
+                }
+                for recipient in frontier:
+                    distances[(source, recipient)] = distance
+                visited.update(frontier)
+        return distances
+
+    @staticmethod
+    def _shortest_distance(
+        source: str,
+        target: str,
+        adjacency: Mapping[str, AbstractSet[str]],
+    ) -> int | None:
+        if source == target:
+            return 0
+        frontier = {source}
+        visited = {source}
+        distance = 0
+        while frontier:
+            distance += 1
+            frontier = {
+                recipient
+                for node in frontier
+                for recipient in adjacency.get(node, ())
+                if recipient not in visited
+            }
+            if target in frontier:
+                return distance
+            visited.update(frontier)
+        return None
 
     def _pair_value(self, connectivity: float) -> float:
         """Reward a second distinct route more, then approach linear growth."""

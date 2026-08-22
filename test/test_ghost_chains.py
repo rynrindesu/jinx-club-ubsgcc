@@ -9,7 +9,10 @@ from fastapi.testclient import TestClient
 import app.main as main_module
 from app.main import app
 from app.phase1.ghost_chains import (
+    DiscountedWalkScorer,
     GhostChainsEngine,
+    ScoreConfig,
+    TemporalEdge,
     Transaction,
     TransactionConflictError,
     TransactionValidationError,
@@ -155,6 +158,76 @@ class StructuralScoringTests(unittest.TestCase):
 
         self.assertEqual(score_edges(topology), score_edges(renamed))
 
+    def test_overlapping_cycle_scores_do_not_depend_on_identifier_sort_order(self):
+        topology = [
+            ("A", "B"),
+            ("B", "C"),
+            ("C", "A"),
+            ("B", "D"),
+            ("D", "E"),
+            ("E", "B"),
+            ("C", "D"),
+        ]
+        mappings = (
+            {"A": "z", "B": "a", "C": "y", "D": "x", "E": "w"},
+            {"A": "a", "B": "z", "C": "b", "D": "c", "E": "d"},
+        )
+        expected = score_edges(topology, prefix="cycle-name-base")
+
+        for index, mapping in enumerate(mappings):
+            renamed = [
+                (mapping[sender], mapping[recipient])
+                for sender, recipient in topology
+            ]
+            with self.subTest(mapping=index):
+                self.assertEqual(
+                    expected,
+                    score_edges(renamed, prefix=f"cycle-name-{index}"),
+                )
+
+    def test_temporal_route_cap_does_not_depend_on_identifier_sort_order(self):
+        topology = [
+            ("A", "B"),
+            ("A", "C"),
+            ("B", "D"),
+            ("C", "D"),
+            ("D", "E"),
+            ("B", "E"),
+            ("E", "A"),
+            ("C", "F"),
+            ("F", "A"),
+        ]
+        renamed = {
+            "A": "z",
+            "B": "q",
+            "C": "a",
+            "D": "x",
+            "E": "b",
+            "F": "y",
+        }
+
+        def capped_scores(mapping):
+            scorer = DiscountedWalkScorer(
+                ScoreConfig(max_route_signatures=5)
+            )
+            engine = GhostChainsEngine(scorer=scorer)
+            return engine.score_batch(
+                [
+                    transaction(
+                        f"cap-{index}",
+                        mapping[sender],
+                        mapping[recipient],
+                        when=BASE_TIME + timedelta(minutes=index),
+                    )
+                    for index, (sender, recipient) in enumerate(topology)
+                ]
+            )
+
+        self.assertEqual(
+            capped_scores({node: node for node in "ABCDEF"}),
+            capped_scores(renamed),
+        )
+
     def test_disconnected_history_does_not_change_candidate_score(self):
         base_engine = GhostChainsEngine()
         base_engine.score_transaction(transaction("base-1", "A", "B"))
@@ -226,6 +299,19 @@ class StructuralScoringTests(unittest.TestCase):
             )
         )
 
+    def test_return_and_shortcut_remain_visible_beyond_enumeration_bound(self):
+        path = [(f"N{index}", f"N{index + 1}") for index in range(12)]
+        extension = score_edges(path, prefix="long-extension")[-1]
+        shortcut = score_edges(
+            [*path, ("N0", "N12")], prefix="long-shortcut"
+        )[-1]
+        returning = score_edges(
+            [*path, ("N12", "N0")], prefix="long-return"
+        )[-1]
+
+        self.assertGreater(shortcut, extension)
+        self.assertGreater(returning, shortcut)
+
     def test_every_bounded_return_outranks_acyclic_evidence(self):
         convergence = score_edges(
             [("A", "B"), ("A", "C"), ("B", "D"), ("C", "D")],
@@ -263,7 +349,7 @@ class StructuralScoringTests(unittest.TestCase):
 
         self.assertGreater(overlapping, disjoint)
 
-    def test_novelty_and_reinforcement_share_one_acyclic_cap(self):
+    def test_acyclic_evidence_accumulates_but_stays_below_a_return(self):
         branches = 5
         acyclic_history = [
             edge
@@ -279,7 +365,10 @@ class StructuralScoringTests(unittest.TestCase):
             prefix="acyclic-cap-return",
         )[-1]
 
-        self.assertLessEqual(dense_acyclic, 0.2)
+        simple_extension = score_edges(
+            [("X", "Y"), ("Y", "Z")], prefix="acyclic-simple"
+        )[-1]
+        self.assertGreater(dense_acyclic, simple_extension)
         self.assertGreater(returning, dense_acyclic)
 
     def test_stronger_recurring_history_does_not_lower_candidate_risk(self):
@@ -351,6 +440,27 @@ class StructuralScoringTests(unittest.TestCase):
 
 
 class TemporalStateTests(unittest.TestCase):
+    def test_temporal_hypothesis_cap_never_drops_observed_edges(self):
+        scorer = DiscountedWalkScorer(
+            ScoreConfig(max_route_signatures=1)
+        )
+        events = (
+            TemporalEdge("A", "B", BASE_TIME, 1),
+            TemporalEdge(
+                "B", "C", BASE_TIME + timedelta(minutes=1), 2
+            ),
+            TemporalEdge(
+                "X", "Y", BASE_TIME + timedelta(minutes=2), 3
+            ),
+        )
+
+        state = scorer._temporal_route_state(events)
+
+        self.assertEqual(
+            state.direct_pairs,
+            frozenset({("A", "B"), ("B", "C"), ("X", "Y")}),
+        )
+
     def test_twenty_four_hour_window_includes_the_exact_boundary(self):
         inside = GhostChainsEngine()
         inside.score_transaction(transaction("inside-1", "A", "B"))
@@ -547,6 +657,36 @@ class TemporalStateTests(unittest.TestCase):
         self.assertGreater(rapid, medium)
         self.assertGreater(medium, slow)
         self.assertGreater(slow, 0.0)
+
+    def test_temporal_shortcut_support_uses_the_route_completion_time(self):
+        def shortcut_score(candidate_gap: timedelta) -> float:
+            engine = GhostChainsEngine()
+            engine.score_transaction(transaction("path-1", "A", "B"))
+            engine.score_transaction(
+                transaction(
+                    "path-2",
+                    "B",
+                    "C",
+                    when=BASE_TIME + timedelta(minutes=1),
+                )
+            )
+            return engine.score_transaction(
+                transaction(
+                    f"shortcut-{candidate_gap}",
+                    "A",
+                    "C",
+                    when=BASE_TIME + candidate_gap,
+                )
+            )
+
+        rapid = shortcut_score(timedelta(minutes=2))
+        stale = shortcut_score(timedelta(hours=23))
+        retroactive = shortcut_score(timedelta(seconds=30))
+
+        self.assertGreater(rapid, stale)
+        self.assertGreater(rapid, retroactive)
+        self.assertGreater(stale, 0.0)
+        self.assertGreater(retroactive, 0.0)
 
     def test_repeated_edge_can_enable_a_new_causal_route(self):
         engine = GhostChainsEngine()
