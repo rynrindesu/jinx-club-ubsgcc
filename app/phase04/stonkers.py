@@ -18,7 +18,7 @@ PRESENT_YEAR = 2037
 
 @dataclass(frozen=True, slots=True)
 class _Lot:
-    """One single-use stock listing that may be bought in part."""
+    """One historical stock listing with a bounded available quantity."""
 
     year: int
     stock: str

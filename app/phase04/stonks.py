@@ -258,7 +258,7 @@ def _candidate_transitions(
 
         # Preserve every single-stock choice as well.  A lower-ratio stock can
         # be the best integer purchase when the higher-ratio price leaves cash
-        # stranded, and it may preserve other one-use lots for later trips.
+        # stranded, and it may preserve other finite lots for later trips.
         for opportunity in opportunities:
             transition = _make_transition(
                 state, buy_year, sell_year, (opportunity,), energy

@@ -165,5 +165,23 @@ class StonksTests(unittest.TestCase):
 
         self.assertEqual(_score_actions(case, solve_case(case)), 71)
 
+    def test_large_market_compounds_between_two_past_years(self):
+        case = {
+            "energy": 10,
+            "capital": 1,
+            "timeline": {"2037": {}, "2036": {}, "2035": {}},
+        }
+        for index in range(40):
+            outbound = f"A{index}"
+            inbound = f"B{index}"
+            case["timeline"]["2037"][outbound] = {"price": 1, "qty": 0}
+            case["timeline"]["2037"][inbound] = {"price": 1, "qty": 0}
+            case["timeline"]["2036"][outbound] = {"price": 1, "qty": 1}
+            case["timeline"]["2035"][outbound] = {"price": 2, "qty": 0}
+            case["timeline"]["2035"][inbound] = {"price": 1, "qty": 1}
+            case["timeline"]["2036"][inbound] = {"price": 2, "qty": 0}
+
+        self.assertEqual(_score_actions(case, solve_case(case)), 81)
+
 if __name__ == "__main__":
     unittest.main()

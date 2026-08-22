@@ -88,7 +88,7 @@ def _normalize_case(
                 continue
             buy_price = prices[buy_year][stock]
 
-            # A non-increasing purchase only consumes cash and a one-use lot.
+            # A non-increasing purchase only consumes cash and finite stock.
             # It cannot be part of a strictly better terminal plan.
             can_profit = any(
                 sell_price > buy_price
