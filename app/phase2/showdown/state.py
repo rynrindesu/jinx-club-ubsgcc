@@ -105,9 +105,15 @@ class OpponentProfile:
             return uniform
 
         denominator = sum(weight for _, weight in contextual_samples)
+        raw_community = _integer(payload.get("community_number"))
+        community = (
+            raw_community
+            if raw_community is not None and 1 <= raw_community <= 13
+            else None
+        )
         likelihoods: list[float] = []
         for number in range(1, 14):
-            strength = rule_knowledge.estimate(number, None).mean
+            strength = rule_knowledge.estimate(number, community).mean
             similarity = sum(
                 weight
                 * math.exp(-0.5 * ((strength - sample.strength) / 0.18) ** 2)
