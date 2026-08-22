@@ -22,6 +22,7 @@ from .phase3.ghost_chains import (
     reset as reset_phase_three_ghost_chains,
     score_batch as score_phase_three_ghost_chains_batch,
 )
+from .phase04.stonks import solve_cases as solve_stonks_cases
 from .showdown import decide_move
 from .phase1.toolbox.server import mcp
 from .phase2.toolbox.server import register_tools as register_phase2_toolbox_tools
@@ -173,3 +174,10 @@ def kan_cheong_delivery_driver(
         case_id: solve_case(case)
         for case_id, case in cases.items()
     }
+
+
+@app.post("/stonks")
+def stonks_endpoint(cases: list[dict[str, Any]]) -> list[list[str]]:
+    """Plan energy-safe stock trades for each independent timeline."""
+
+    return solve_stonks_cases(cases)

@@ -6,6 +6,7 @@ One FastAPI deployment hosts handlers for multiple coding challenges.
 
 - `POST /solve` — retained mock adaptive-API challenge.
 - `POST /move` — SHOWDOWN, dispatched by phase from `app/showdown/`.
+- `POST /stonks` — Phase 04 Time Travelling Stonks planner.
 - `GET /health` — warm-up and deployment health check.
 
 ## Run locally

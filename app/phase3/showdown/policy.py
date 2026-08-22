@@ -135,6 +135,29 @@ class HighVariancePolicy:
             request.own_player.chip_delta < max(10, leader + 1)
         )
 
+        # Never let attractive pot odds turn a middling multiway hand into an
+        # uncontrolled stack call.  The second replay's remaining catastrophic
+        # leak was a 194-chip call with a 7.  Large calls need both robust share
+        # and a meaningful chance to beat every continuing opponent.
+        if request.to_call and not desperate:
+            call_cost = min(request.your_stack, request.to_call)
+            exposure = call_cost / max(1, request.your_stack)
+            pot_odds = call_cost / max(1, request.pot + call_cost)
+            call_is_robust = (
+                base_metrics.expected_share >= max(0.58, pot_odds + 0.10)
+                and base_metrics.sole_win_probability >= 0.45
+            )
+            all_in_is_robust = (
+                base_metrics.expected_share >= max(0.72, pot_odds + 0.12)
+                and base_metrics.sole_win_probability >= 0.72
+            )
+            if (exposure >= 0.25 and not call_is_robust) or (
+                call_cost >= request.your_stack and not all_in_is_robust
+            ):
+                candidates = [
+                    candidate for candidate in candidates if candidate.action != "call"
+                ]
+
         # Avoid the repeated bet/re-raise/fold leak: make at most one voluntary
         # wager per street unless the showdown is exceptionally strong or the
         # exact late-leg target requires the extra variance.

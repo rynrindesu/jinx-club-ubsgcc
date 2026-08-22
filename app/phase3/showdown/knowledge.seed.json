@@ -79,6 +79,37 @@
     "replay-v1:amaranth:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-3:8:opponents",
     "replay-v1:amaranth:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-3:9:opponents",
     "replay-v1:amaranth:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-3:9:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:10:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:11:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:11:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:12:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:13:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:13:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:14:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:15:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:16:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:17:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:17:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:18:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:19:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:19:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:1:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:1:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:2:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:2:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:3:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:3:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:4:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:4:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:5:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:5:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:6:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:6:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:7:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:7:rule",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:8:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:9:opponents",
+    "replay-v1:amaranth:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-3:9:rule",
     "replay-v1:cinnabar:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-4:10:opponents",
     "replay-v1:cinnabar:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-4:10:rule",
     "replay-v1:cinnabar:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-4:11:opponents",
@@ -154,6 +185,92 @@
     "replay-v1:cinnabar:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-4:8:opponents",
     "replay-v1:cinnabar:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-4:9:opponents",
     "replay-v1:cinnabar:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-4:9:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:10:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:11:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:11:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:12:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:12:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:13:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:13:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:14:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:14:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:15:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:16:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:16:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:17:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:18:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:18:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:19:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:19:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:1:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:1:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:20:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:21:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:21:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:22:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:23:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:24:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:25:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:26:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:26:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:27:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:27:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:28:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:28:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:29:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:2:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:2:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:30:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:30:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:31:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:32:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:32:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:33:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:34:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:34:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:35:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:36:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:37:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:38:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:39:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:3:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:40:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:41:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:42:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:42:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:43:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:44:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:44:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:45:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:46:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:46:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:47:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:48:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:49:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:4:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:4:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:50:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:50:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:51:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:51:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:52:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:53:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:54:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:55:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:56:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:57:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:58:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:59:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:5:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:5:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:60:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:60:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:6:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:6:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:7:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:7:rule",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:8:opponents",
+    "replay-v1:cinnabar:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-4:9:opponents",
     "replay-v1:obsidian:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-2:10:opponents",
     "replay-v1:obsidian:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-2:10:rule",
     "replay-v1:obsidian:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-2:11:opponents",
@@ -241,6 +358,78 @@
     "replay-v1:obsidian:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-2:8:opponents",
     "replay-v1:obsidian:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-2:8:rule",
     "replay-v1:obsidian:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-2:9:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:10:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:11:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:12:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:12:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:13:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:13:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:14:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:14:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:15:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:16:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:17:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:17:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:18:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:18:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:19:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:1:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:1:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:20:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:21:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:22:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:23:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:24:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:24:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:25:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:26:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:27:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:28:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:29:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:2:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:30:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:31:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:32:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:33:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:34:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:35:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:36:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:37:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:38:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:39:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:3:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:40:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:41:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:42:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:43:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:43:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:44:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:45:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:46:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:47:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:47:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:48:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:49:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:4:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:4:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:50:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:51:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:52:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:53:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:54:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:55:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:56:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:57:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:58:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:59:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:5:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:60:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:6:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:7:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:7:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:8:opponents",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:8:rule",
+    "replay-v1:obsidian:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-2:9:opponents",
     "replay-v1:verdigris:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-1:10:opponents",
     "replay-v1:verdigris:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-1:10:rule",
     "replay-v1:verdigris:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-1:11:opponents",
@@ -315,22 +504,137 @@
     "replay-v1:verdigris:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-1:7:opponents",
     "replay-v1:verdigris:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-1:7:rule",
     "replay-v1:verdigris:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-1:8:opponents",
-    "replay-v1:verdigris:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-1:9:opponents"
+    "replay-v1:verdigris:2d17d3fe-e848-4e7c-809b-2f519e6e6a86:leg-1:9:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:10:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:10:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:11:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:11:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:12:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:13:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:14:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:14:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:15:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:15:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:16:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:16:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:17:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:18:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:19:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:19:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:1:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:1:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:20:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:20:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:21:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:21:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:22:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:22:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:23:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:23:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:24:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:24:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:25:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:26:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:27:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:27:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:28:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:29:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:29:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:2:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:2:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:30:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:31:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:31:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:32:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:32:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:33:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:33:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:34:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:34:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:35:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:35:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:36:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:37:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:38:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:39:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:39:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:3:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:3:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:40:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:41:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:42:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:42:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:43:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:44:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:45:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:46:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:47:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:48:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:49:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:4:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:4:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:50:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:51:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:52:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:53:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:54:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:55:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:55:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:56:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:57:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:58:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:59:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:59:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:5:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:5:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:60:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:60:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:6:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:6:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:7:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:7:rule",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:8:opponents",
+    "replay-v1:verdigris:81be0806-d02f-434b-b68d-13d89f9b14d8:leg-1:9:opponents"
   ],
   "opponents": {
     "Bram": {
       "alpha": 0.75,
       "counts": {
+        "post_reveal|facing|large|2|early|medium": {
+          "call": 2.0
+        },
+        "post_reveal|facing|large|2|late|weak": {
+          "call": 1.0
+        },
+        "post_reveal|facing|large|3|late|strong": {
+          "raise": 1.0
+        },
         "post_reveal|facing|medium|2|early|medium": {
           "call": 1.0
+        },
+        "post_reveal|facing|medium|2|early|weak": {
+          "fold": 1.0
         },
         "post_reveal|facing|medium|2|late|medium": {
           "call": 2.0
         },
         "post_reveal|facing|medium|2|late|premium": {
+          "call": 1.0,
           "raise": 1.0
         },
+        "post_reveal|facing|medium|3|early|medium": {
+          "call": 2.0
+        },
         "post_reveal|facing|medium|3|early|weak": {
+          "call": 1.0
+        },
+        "post_reveal|facing|medium|3|late|medium": {
+          "call": 2.0
+        },
+        "post_reveal|facing|medium|3|late|premium": {
+          "raise": 1.0
+        },
+        "post_reveal|facing|medium|3|late|weak": {
           "call": 1.0
         },
         "post_reveal|facing|medium|3|middle|medium": {
@@ -341,42 +645,81 @@
           "raise": 1.0
         },
         "post_reveal|facing|medium|4|late|medium": {
+          "call": 2.0
+        },
+        "post_reveal|facing|medium|4|middle|medium": {
           "call": 1.0
         },
         "post_reveal|facing|overbet|2|late|premium": {
           "call": 1.0
         },
+        "post_reveal|facing|overbet|2|middle|premium": {
+          "raise": 1.0
+        },
+        "post_reveal|facing|overbet|3|late|premium": {
+          "raise": 1.0
+        },
+        "post_reveal|facing|small|2|late|strong": {
+          "call": 1.0
+        },
         "post_reveal|facing|small|2|middle|medium": {
           "call": 1.0
+        },
+        "post_reveal|facing|small|3|early|medium": {
+          "call": 1.0
+        },
+        "post_reveal|facing|small|3|late|premium": {
+          "raise": 1.0
+        },
+        "post_reveal|facing|small|3|late|strong": {
+          "raise": 1.0
         },
         "post_reveal|facing|small|3|middle|strong": {
           "raise": 1.0
         },
+        "post_reveal|facing|small|4|late|strong": {
+          "raise": 1.0
+        },
+        "post_reveal|facing|small|4|middle|strong": {
+          "call": 1.0
+        },
         "post_reveal|free|none|2|early|medium": {
-          "check": 2.0
+          "bet": 1.0,
+          "check": 4.0
         },
         "post_reveal|free|none|2|early|premium": {
-          "bet": 3.0
+          "bet": 5.0
         },
         "post_reveal|free|none|2|early|strong": {
-          "bet": 1.0
-        },
-        "post_reveal|free|none|2|late|medium": {
           "bet": 1.0,
           "check": 1.0
         },
+        "post_reveal|free|none|2|early|weak": {
+          "check": 2.0
+        },
+        "post_reveal|free|none|2|late|medium": {
+          "bet": 1.0,
+          "check": 2.0
+        },
+        "post_reveal|free|none|2|late|premium": {
+          "check": 2.0
+        },
         "post_reveal|free|none|2|late|strong": {
-          "bet": 3.0,
+          "bet": 6.0,
           "check": 1.0
         },
         "post_reveal|free|none|2|middle|medium": {
-          "check": 1.0
+          "check": 2.0
         },
         "post_reveal|free|none|2|middle|premium": {
-          "bet": 2.0
+          "bet": 4.0
         },
         "post_reveal|free|none|3|early|medium": {
-          "check": 1.0
+          "bet": 2.0,
+          "check": 5.0
+        },
+        "post_reveal|free|none|3|early|premium": {
+          "bet": 2.0
         },
         "post_reveal|free|none|3|early|strong": {
           "bet": 2.0
@@ -384,8 +727,18 @@
         "post_reveal|free|none|3|early|weak": {
           "check": 1.0
         },
-        "post_reveal|free|none|3|late|strong": {
+        "post_reveal|free|none|3|late|medium": {
+          "check": 1.0
+        },
+        "post_reveal|free|none|3|late|premium": {
           "bet": 1.0
+        },
+        "post_reveal|free|none|3|late|strong": {
+          "bet": 2.0
+        },
+        "post_reveal|free|none|3|late|weak": {
+          "bet": 1.0,
+          "check": 2.0
         },
         "post_reveal|free|none|3|middle|medium": {
           "check": 1.0
@@ -394,7 +747,14 @@
           "bet": 1.0
         },
         "post_reveal|free|none|3|middle|strong": {
-          "bet": 1.0
+          "bet": 3.0
+        },
+        "post_reveal|free|none|3|middle|weak": {
+          "bet": 1.0,
+          "check": 1.0
+        },
+        "post_reveal|free|none|4|early|premium": {
+          "bet": 2.0
         },
         "post_reveal|free|none|4|late|medium": {
           "bet": 1.0
@@ -405,37 +765,84 @@
         "post_reveal|free|none|4|late|weak": {
           "check": 1.0
         },
+        "post_reveal|free|none|4|middle|medium": {
+          "check": 1.0
+        },
         "post_reveal|free|none|4|middle|strong": {
           "bet": 1.0
         },
-        "pre_reveal|facing|large|2|early|weak": {
+        "pre_reveal|facing|all_in|2|late|weak": {
           "fold": 1.0
         },
+        "pre_reveal|facing|all_in|3|late|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|all_in|4|late|premium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|all_in|4|late|weak": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|all_in|4|middle|medium": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|all_in|5|late|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|large|2|early|premium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|large|2|early|strong": {
+          "call": 2.0
+        },
+        "pre_reveal|facing|large|2|early|weak": {
+          "fold": 2.0
+        },
         "pre_reveal|facing|large|2|late|premium": {
+          "call": 1.0,
           "raise": 1.0
         },
         "pre_reveal|facing|large|2|middle|strong": {
           "raise": 1.0
         },
         "pre_reveal|facing|large|3|early|medium": {
-          "call": 2.0
+          "call": 2.0,
+          "raise": 1.0
+        },
+        "pre_reveal|facing|large|3|early|strong": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|large|3|early|weak": {
+          "raise": 1.0
         },
         "pre_reveal|facing|large|3|late|medium": {
-          "call": 1.0
+          "call": 3.0
         },
         "pre_reveal|facing|large|3|late|premium": {
           "raise": 1.0
         },
+        "pre_reveal|facing|large|3|middle|medium": {
+          "call": 1.0
+        },
         "pre_reveal|facing|large|3|middle|premium": {
           "raise": 1.0
+        },
+        "pre_reveal|facing|large|3|middle|weak": {
+          "call": 1.0
         },
         "pre_reveal|facing|large|4|late|premium": {
           "raise": 1.0
         },
+        "pre_reveal|facing|large|4|late|weak": {
+          "fold": 1.0
+        },
         "pre_reveal|facing|large|4|middle|medium": {
-          "call": 1.0
+          "call": 2.0
         },
         "pre_reveal|facing|large|5|middle|strong": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|large|6+|middle|medium": {
           "raise": 1.0
         },
         "pre_reveal|facing|medium|2|late|medium": {
@@ -445,7 +852,7 @@
           "call": 1.0
         },
         "pre_reveal|facing|medium|2|middle|medium": {
-          "call": 1.0
+          "call": 2.0
         },
         "pre_reveal|facing|medium|2|middle|premium": {
           "raise": 1.0
@@ -459,14 +866,38 @@
         "pre_reveal|facing|medium|3|early|strong": {
           "call": 1.0
         },
+        "pre_reveal|facing|medium|3|early|weak": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|medium|3|late|medium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|medium|3|late|premium": {
+          "call": 2.0
+        },
         "pre_reveal|facing|medium|3|middle|strong": {
           "raise": 1.0
+        },
+        "pre_reveal|facing|medium|4|early|strong": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|medium|4|late|medium": {
+          "call": 1.0
         },
         "pre_reveal|facing|medium|4|late|weak": {
           "raise": 1.0
         },
+        "pre_reveal|facing|overbet|2|late|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|overbet|2|late|strong": {
+          "raise": 2.0
+        },
         "pre_reveal|facing|overbet|2|middle|premium": {
           "raise": 1.0
+        },
+        "pre_reveal|facing|overbet|2|middle|strong": {
+          "raise": 2.0
         },
         "pre_reveal|facing|overbet|3|late|strong": {
           "raise": 2.0
@@ -477,11 +908,17 @@
         "pre_reveal|facing|overbet|3|middle|weak": {
           "fold": 1.0
         },
-        "pre_reveal|facing|overbet|4|late|premium": {
+        "pre_reveal|facing|overbet|4|late|medium": {
           "raise": 1.0
+        },
+        "pre_reveal|facing|overbet|4|late|premium": {
+          "raise": 2.0
         },
         "pre_reveal|facing|overbet|4|late|strong": {
           "raise": 1.0
+        },
+        "pre_reveal|facing|overbet|4|late|weak": {
+          "fold": 2.0
         },
         "pre_reveal|facing|overbet|4|middle|strong": {
           "raise": 1.0
@@ -490,13 +927,17 @@
           "raise": 1.0
         },
         "pre_reveal|facing|overbet|5|middle|weak": {
-          "fold": 1.0
+          "fold": 2.0
+        },
+        "pre_reveal|facing|small|4|late|medium": {
+          "raise": 1.0
         },
         "pre_reveal|facing|unknown|2|late|medium": {
-          "call": 1.0
+          "call": 1.0,
+          "raise": 1.0
         },
         "pre_reveal|facing|unknown|2|late|premium": {
-          "raise": 3.0
+          "raise": 4.0
         },
         "pre_reveal|facing|unknown|2|late|strong": {
           "call": 1.0,
@@ -505,8 +946,29 @@
         "pre_reveal|facing|unknown|2|late|weak": {
           "fold": 2.0
         },
+        "pre_reveal|facing|unknown|2|middle|medium": {
+          "call": 2.0
+        },
+        "pre_reveal|facing|unknown|2|middle|weak": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|unknown|3|early|medium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|unknown|3|early|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|unknown|3|early|strong": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|unknown|3|late|medium": {
+          "raise": 3.0
+        },
+        "pre_reveal|facing|unknown|3|late|premium": {
+          "raise": 1.0
+        },
         "pre_reveal|facing|unknown|3|late|strong": {
-          "raise": 2.0
+          "raise": 4.0
         },
         "pre_reveal|facing|unknown|3|middle|medium": {
           "call": 1.0,
@@ -517,72 +979,115 @@
         },
         "pre_reveal|facing|unknown|3|middle|strong": {
           "call": 1.0,
-          "raise": 2.0
+          "raise": 4.0
         },
         "pre_reveal|facing|unknown|3|middle|weak": {
-          "fold": 1.0
+          "fold": 2.0
         },
         "pre_reveal|facing|unknown|4|early|medium": {
           "fold": 3.0,
           "raise": 1.0
         },
+        "pre_reveal|facing|unknown|4|early|premium": {
+          "call": 1.0
+        },
         "pre_reveal|facing|unknown|4|early|strong": {
-          "raise": 3.0
+          "raise": 6.0
         },
         "pre_reveal|facing|unknown|4|early|weak": {
-          "fold": 1.0,
-          "raise": 1.0
+          "fold": 3.0,
+          "raise": 2.0
+        },
+        "pre_reveal|facing|unknown|4|late|medium": {
+          "call": 1.0
         },
         "pre_reveal|facing|unknown|4|late|weak": {
           "call": 1.0
         },
-        "pre_reveal|facing|unknown|4|middle|premium": {
-          "raise": 1.0
-        },
-        "pre_reveal|facing|unknown|4|middle|strong": {
-          "raise": 1.0
-        },
-        "pre_reveal|facing|unknown|4|middle|weak": {
-          "call": 2.0
-        },
-        "pre_reveal|facing|unknown|5|early|medium": {
+        "pre_reveal|facing|unknown|4|middle|medium": {
           "call": 1.0,
           "raise": 1.0
         },
+        "pre_reveal|facing|unknown|4|middle|premium": {
+          "raise": 2.0
+        },
+        "pre_reveal|facing|unknown|4|middle|strong": {
+          "raise": 3.0
+        },
+        "pre_reveal|facing|unknown|4|middle|weak": {
+          "call": 2.0,
+          "fold": 1.0
+        },
+        "pre_reveal|facing|unknown|5|early|medium": {
+          "call": 1.0,
+          "fold": 2.0,
+          "raise": 2.0
+        },
         "pre_reveal|facing|unknown|5|early|strong": {
-          "raise": 1.0
+          "raise": 5.0
         },
         "pre_reveal|facing|unknown|5|early|weak": {
-          "fold": 1.0,
-          "raise": 1.0
+          "fold": 3.0,
+          "raise": 4.0
         },
         "pre_reveal|facing|unknown|5|middle|medium": {
-          "call": 1.0
+          "call": 3.0
+        },
+        "pre_reveal|facing|unknown|5|middle|premium": {
+          "raise": 1.0
         },
         "pre_reveal|facing|unknown|5|middle|strong": {
-          "call": 1.0
+          "call": 1.0,
+          "raise": 1.0
+        },
+        "pre_reveal|facing|unknown|5|middle|weak": {
+          "call": 1.0,
+          "fold": 1.0
         },
         "pre_reveal|facing|unknown|6+|early|medium": {
-          "call": 1.0
+          "call": 1.0,
+          "fold": 1.0,
+          "raise": 2.0
+        },
+        "pre_reveal|facing|unknown|6+|early|premium": {
+          "raise": 1.0
         },
         "pre_reveal|facing|unknown|6+|early|strong": {
           "raise": 2.0
+        },
+        "pre_reveal|facing|unknown|6+|early|weak": {
+          "fold": 1.0
         },
         "pre_reveal|free|none|2|late|medium": {
           "check": 2.0
         },
         "pre_reveal|free|none|2|late|weak": {
-          "check": 2.0
+          "check": 3.0
+        },
+        "pre_reveal|free|none|3|late|medium": {
+          "check": 1.0
+        },
+        "pre_reveal|free|none|3|late|weak": {
+          "check": 1.0
         }
       },
       "name": "Bram",
-      "observations": 115.0
+      "observations": 271.0
     },
     "Dana": {
       "alpha": 0.75,
       "counts": {
+        "post_reveal|facing|large|2|early|medium": {
+          "call": 1.0
+        },
         "post_reveal|facing|large|2|early|premium": {
           "raise": 2.0
+        },
+        "post_reveal|facing|large|2|middle|strong": {
+          "call": 1.0
+        },
+        "post_reveal|facing|large|3|early|strong": {
+          "fold": 1.0
         },
         "post_reveal|facing|large|3|middle|strong": {
           "call": 1.0
@@ -593,12 +1098,18 @@
         "post_reveal|facing|medium|2|early|premium": {
           "call": 1.0
         },
+        "post_reveal|facing|medium|2|early|strong": {
+          "call": 1.0
+        },
         "post_reveal|facing|medium|2|early|weak": {
-          "fold": 1.0
+          "fold": 2.0
         },
         "post_reveal|facing|medium|2|late|strong": {
           "call": 1.0,
           "raise": 2.0
+        },
+        "post_reveal|facing|medium|2|middle|medium": {
+          "call": 1.0
         },
         "post_reveal|facing|medium|2|middle|premium": {
           "raise": 1.0
@@ -609,10 +1120,19 @@
         "post_reveal|facing|medium|2|middle|weak": {
           "fold": 2.0
         },
+        "post_reveal|facing|medium|3|middle|premium": {
+          "call": 1.0
+        },
         "post_reveal|facing|medium|3|middle|weak": {
           "fold": 1.0
         },
+        "post_reveal|facing|medium|4|early|premium": {
+          "call": 1.0
+        },
         "post_reveal|facing|overbet|2|early|premium": {
+          "raise": 1.0
+        },
+        "post_reveal|facing|overbet|2|late|premium": {
           "raise": 1.0
         },
         "post_reveal|facing|overbet|2|late|strong": {
@@ -621,60 +1141,69 @@
         "post_reveal|facing|overbet|2|middle|strong": {
           "raise": 1.0
         },
+        "post_reveal|facing|overbet|3|middle|premium": {
+          "raise": 1.0
+        },
         "post_reveal|free|none|2|early|medium": {
-          "check": 2.0
+          "check": 3.0
         },
         "post_reveal|free|none|2|early|premium": {
-          "bet": 4.0
+          "bet": 5.0
         },
         "post_reveal|free|none|2|early|strong": {
-          "bet": 8.0,
+          "bet": 9.0,
           "check": 1.0
         },
         "post_reveal|free|none|2|early|weak": {
-          "check": 2.0
+          "check": 3.0
         },
         "post_reveal|free|none|2|late|medium": {
-          "check": 2.0
+          "check": 3.0
         },
         "post_reveal|free|none|2|late|premium": {
-          "bet": 3.0
+          "bet": 5.0
         },
         "post_reveal|free|none|2|late|strong": {
-          "bet": 6.0
+          "bet": 7.0
         },
         "post_reveal|free|none|2|late|weak": {
           "check": 2.0
         },
         "post_reveal|free|none|2|middle|medium": {
-          "check": 1.0
+          "check": 3.0
         },
         "post_reveal|free|none|2|middle|premium": {
-          "bet": 2.0
+          "bet": 3.0
         },
         "post_reveal|free|none|2|middle|strong": {
-          "bet": 4.0
+          "bet": 5.0
+        },
+        "post_reveal|free|none|2|middle|weak": {
+          "check": 1.0
         },
         "post_reveal|free|none|3|early|premium": {
-          "bet": 2.0
+          "bet": 3.0
         },
         "post_reveal|free|none|3|early|strong": {
-          "check": 1.0
+          "check": 4.0
         },
         "post_reveal|free|none|3|late|premium": {
           "bet": 2.0
         },
         "post_reveal|free|none|3|late|strong": {
-          "check": 1.0
+          "check": 2.0
         },
         "post_reveal|free|none|3|middle|medium": {
           "check": 1.0
+        },
+        "post_reveal|free|none|3|middle|premium": {
+          "bet": 1.0
         },
         "post_reveal|free|none|3|middle|weak": {
           "check": 2.0
         },
         "post_reveal|free|none|4|early|premium": {
-          "bet": 2.0
+          "bet": 3.0
         },
         "post_reveal|free|none|4|early|weak": {
           "check": 1.0
@@ -692,6 +1221,7 @@
           "fold": 1.0
         },
         "pre_reveal|facing|all_in|3|late|strong": {
+          "fold": 1.0,
           "raise": 1.0
         },
         "pre_reveal|facing|all_in|3|late|weak": {
@@ -701,23 +1231,42 @@
           "fold": 1.0
         },
         "pre_reveal|facing|all_in|4|middle|medium": {
-          "fold": 1.0
+          "fold": 2.0
         },
         "pre_reveal|facing|all_in|4|middle|strong": {
           "call": 1.0
         },
+        "pre_reveal|facing|all_in|4|middle|weak": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|all_in|5|early|medium": {
+          "fold": 1.0
+        },
         "pre_reveal|facing|all_in|5|early|premium": {
-          "raise": 1.0
+          "raise": 2.0
         },
         "pre_reveal|facing|all_in|6+|early|medium": {
+          "fold": 2.0
+        },
+        "pre_reveal|facing|all_in|6+|early|strong": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|all_in|6+|early|weak": {
           "fold": 1.0
         },
         "pre_reveal|facing|large|2|early|premium": {
+          "call": 1.0,
+          "raise": 2.0
+        },
+        "pre_reveal|facing|large|2|early|strong": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|large|2|late|premium": {
           "raise": 1.0
         },
         "pre_reveal|facing|large|2|late|strong": {
           "call": 2.0,
-          "raise": 1.0
+          "raise": 2.0
         },
         "pre_reveal|facing|large|2|late|weak": {
           "fold": 1.0
@@ -726,13 +1275,14 @@
           "fold": 1.0
         },
         "pre_reveal|facing|large|3|middle|medium": {
-          "fold": 2.0
+          "fold": 3.0
         },
         "pre_reveal|facing|large|3|middle|premium": {
-          "call": 2.0
+          "call": 3.0,
+          "raise": 2.0
         },
         "pre_reveal|facing|large|3|middle|strong": {
-          "call": 2.0,
+          "call": 4.0,
           "fold": 1.0,
           "raise": 1.0
         },
@@ -754,61 +1304,95 @@
         "pre_reveal|facing|large|5|late|premium": {
           "call": 1.0
         },
+        "pre_reveal|facing|large|5|late|weak": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|large|5|middle|medium": {
+          "fold": 1.0
+        },
         "pre_reveal|facing|large|5|middle|strong": {
           "fold": 1.0
         },
+        "pre_reveal|facing|large|5|middle|weak": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|large|6+|middle|strong": {
+          "fold": 1.0
+        },
         "pre_reveal|facing|medium|2|early|strong": {
-          "call": 3.0
+          "call": 4.0
+        },
+        "pre_reveal|facing|medium|2|late|strong": {
+          "call": 1.0
         },
         "pre_reveal|facing|medium|2|middle|strong": {
           "call": 1.0
         },
         "pre_reveal|facing|medium|3|early|premium": {
+          "call": 1.0,
+          "raise": 1.0
+        },
+        "pre_reveal|facing|overbet|2|early|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|overbet|2|early|strong": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|overbet|2|late|medium": {
           "call": 1.0
         },
         "pre_reveal|facing|overbet|2|late|premium": {
+          "call": 1.0,
           "raise": 1.0
         },
         "pre_reveal|facing|overbet|2|late|strong": {
           "call": 1.0,
-          "raise": 3.0
+          "raise": 5.0
         },
         "pre_reveal|facing|overbet|2|late|weak": {
           "fold": 1.0
+        },
+        "pre_reveal|facing|overbet|3|early|premium": {
+          "raise": 1.0
         },
         "pre_reveal|facing|overbet|3|early|strong": {
           "call": 1.0,
           "raise": 1.0
         },
         "pre_reveal|facing|overbet|3|late|medium": {
-          "fold": 1.0
+          "fold": 4.0
+        },
+        "pre_reveal|facing|overbet|3|late|premium": {
+          "call": 1.0,
+          "raise": 1.0
         },
         "pre_reveal|facing|overbet|3|late|strong": {
-          "call": 1.0,
-          "fold": 1.0
+          "call": 3.0,
+          "fold": 2.0
         },
         "pre_reveal|facing|overbet|3|late|weak": {
           "fold": 2.0
         },
         "pre_reveal|facing|overbet|4|late|medium": {
-          "fold": 2.0
+          "fold": 4.0
         },
         "pre_reveal|facing|overbet|4|late|premium": {
           "call": 1.0
         },
         "pre_reveal|facing|overbet|4|late|strong": {
-          "fold": 2.0
+          "fold": 4.0
         },
         "pre_reveal|facing|overbet|4|late|weak": {
           "fold": 2.0
         },
         "pre_reveal|facing|overbet|4|middle|medium": {
-          "fold": 1.0
+          "fold": 2.0
         },
         "pre_reveal|facing|overbet|4|middle|premium": {
           "call": 1.0
         },
         "pre_reveal|facing|overbet|4|middle|strong": {
+          "call": 1.0,
           "fold": 1.0
         },
         "pre_reveal|facing|overbet|4|middle|weak": {
@@ -817,11 +1401,23 @@
         "pre_reveal|facing|overbet|5|late|medium": {
           "fold": 1.0
         },
+        "pre_reveal|facing|overbet|5|late|weak": {
+          "fold": 3.0
+        },
+        "pre_reveal|facing|overbet|5|middle|medium": {
+          "fold": 2.0
+        },
+        "pre_reveal|facing|overbet|5|middle|weak": {
+          "fold": 2.0
+        },
         "pre_reveal|facing|overbet|6+|middle|medium": {
           "fold": 2.0
         },
+        "pre_reveal|facing|overbet|6+|middle|strong": {
+          "fold": 1.0
+        },
         "pre_reveal|facing|unknown|2|early|medium": {
-          "call": 3.0,
+          "call": 4.0,
           "fold": 3.0
         },
         "pre_reveal|facing|unknown|2|early|premium": {
@@ -835,10 +1431,11 @@
           "fold": 8.0
         },
         "pre_reveal|facing|unknown|2|late|premium": {
-          "raise": 7.0
+          "raise": 9.0
         },
         "pre_reveal|facing|unknown|2|late|strong": {
-          "raise": 7.0
+          "call": 1.0,
+          "raise": 11.0
         },
         "pre_reveal|facing|unknown|2|late|weak": {
           "fold": 1.0
@@ -850,20 +1447,20 @@
           "call": 2.0
         },
         "pre_reveal|facing|unknown|3|early|medium": {
-          "fold": 5.0
+          "fold": 6.0
         },
         "pre_reveal|facing|unknown|3|early|premium": {
           "call": 3.0
         },
         "pre_reveal|facing|unknown|3|early|strong": {
-          "call": 2.0,
+          "call": 4.0,
           "fold": 2.0
         },
         "pre_reveal|facing|unknown|3|early|weak": {
-          "fold": 6.0
+          "fold": 7.0
         },
         "pre_reveal|facing|unknown|3|late|medium": {
-          "fold": 1.0
+          "fold": 2.0
         },
         "pre_reveal|facing|unknown|3|late|premium": {
           "call": 1.0
@@ -872,25 +1469,32 @@
           "fold": 2.0
         },
         "pre_reveal|facing|unknown|3|middle|medium": {
-          "fold": 3.0
+          "fold": 4.0
         },
         "pre_reveal|facing|unknown|3|middle|premium": {
-          "raise": 2.0
+          "raise": 3.0
         },
         "pre_reveal|facing|unknown|3|middle|strong": {
-          "fold": 1.0
-        },
-        "pre_reveal|facing|unknown|3|middle|weak": {
+          "call": 1.0,
           "fold": 2.0
         },
+        "pre_reveal|facing|unknown|3|middle|weak": {
+          "fold": 4.0
+        },
         "pre_reveal|facing|unknown|4|early|medium": {
-          "fold": 6.0
+          "fold": 7.0
+        },
+        "pre_reveal|facing|unknown|4|early|premium": {
+          "call": 2.0
         },
         "pre_reveal|facing|unknown|4|early|strong": {
-          "fold": 4.0,
+          "fold": 5.0,
           "raise": 1.0
         },
         "pre_reveal|facing|unknown|4|early|weak": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|unknown|4|late|strong": {
           "fold": 1.0
         },
         "pre_reveal|facing|unknown|4|middle|medium": {
@@ -898,17 +1502,20 @@
         },
         "pre_reveal|facing|unknown|4|middle|strong": {
           "call": 1.0,
-          "fold": 2.0,
+          "fold": 3.0,
           "raise": 1.0
         },
         "pre_reveal|facing|unknown|5|early|medium": {
-          "fold": 3.0
+          "fold": 5.0
         },
         "pre_reveal|facing|unknown|5|early|strong": {
-          "fold": 4.0
+          "fold": 6.0
         },
         "pre_reveal|facing|unknown|5|early|weak": {
-          "fold": 4.0
+          "fold": 8.0
+        },
+        "pre_reveal|facing|unknown|5|late|premium": {
+          "raise": 1.0
         },
         "pre_reveal|facing|unknown|5|late|strong": {
           "fold": 1.0
@@ -917,16 +1524,19 @@
           "fold": 1.0
         },
         "pre_reveal|facing|unknown|6+|early|strong": {
+          "fold": 2.0
+        },
+        "pre_reveal|facing|unknown|6+|early|weak": {
           "fold": 1.0
         },
         "pre_reveal|facing|unknown|6+|middle|strong": {
           "fold": 1.0
         },
         "pre_reveal|free|none|2|late|medium": {
-          "check": 1.0
+          "check": 2.0
         },
         "pre_reveal|free|none|2|late|weak": {
-          "check": 3.0
+          "check": 5.0
         },
         "pre_reveal|free|none|3|late|medium": {
           "check": 1.0
@@ -938,17 +1548,23 @@
           "check": 1.0
         },
         "pre_reveal|free|none|4|late|weak": {
-          "check": 1.0
+          "check": 2.0
         }
       },
       "name": "Dana",
-      "observations": 251.0
+      "observations": 376.0
     },
     "Miles": {
       "alpha": 0.75,
       "counts": {
         "post_reveal|facing|large|2|early|premium": {
           "raise": 3.0
+        },
+        "post_reveal|facing|large|2|late|premium": {
+          "raise": 1.0
+        },
+        "post_reveal|facing|large|2|late|strong": {
+          "raise": 1.0
         },
         "post_reveal|facing|large|2|middle|weak": {
           "fold": 1.0
@@ -959,14 +1575,27 @@
         "post_reveal|facing|large|3|early|strong": {
           "call": 1.0
         },
+        "post_reveal|facing|large|3|early|weak": {
+          "fold": 1.0
+        },
         "post_reveal|facing|large|3|late|premium": {
           "call": 1.0
         },
         "post_reveal|facing|large|4|early|strong": {
           "call": 1.0
         },
-        "post_reveal|facing|medium|2|late|strong": {
+        "post_reveal|facing|medium|2|early|medium": {
           "call": 1.0
+        },
+        "post_reveal|facing|medium|2|late|medium": {
+          "call": 2.0
+        },
+        "post_reveal|facing|medium|2|late|premium": {
+          "raise": 1.0
+        },
+        "post_reveal|facing|medium|2|late|strong": {
+          "call": 3.0,
+          "raise": 1.0
         },
         "post_reveal|facing|medium|2|middle|medium": {
           "call": 1.0
@@ -975,19 +1604,32 @@
           "raise": 1.0
         },
         "post_reveal|facing|medium|2|middle|strong": {
-          "call": 1.0
+          "call": 1.0,
+          "raise": 1.0
         },
         "post_reveal|facing|medium|2|middle|weak": {
+          "fold": 3.0
+        },
+        "post_reveal|facing|medium|3|early|strong": {
           "fold": 2.0
         },
         "post_reveal|facing|medium|3|late|strong": {
-          "call": 1.0
+          "call": 2.0
         },
         "post_reveal|facing|medium|3|middle|medium": {
           "fold": 1.0
         },
         "post_reveal|facing|medium|3|middle|strong": {
           "fold": 1.0
+        },
+        "post_reveal|facing|medium|4|late|strong": {
+          "call": 1.0
+        },
+        "post_reveal|facing|medium|4|middle|premium": {
+          "call": 2.0
+        },
+        "post_reveal|facing|overbet|2|late|premium": {
+          "call": 1.0
         },
         "post_reveal|facing|overbet|2|middle|medium": {
           "call": 1.0
@@ -996,26 +1638,33 @@
           "call": 1.0
         },
         "post_reveal|facing|overbet|3|late|strong": {
-          "call": 1.0
+          "call": 2.0
         },
         "post_reveal|facing|small|2|middle|strong": {
           "raise": 1.0
         },
+        "post_reveal|facing|small|4|early|strong": {
+          "call": 1.0
+        },
         "post_reveal|free|none|2|early|medium": {
-          "bet": 1.0,
-          "check": 1.0
+          "bet": 2.0,
+          "check": 2.0
         },
         "post_reveal|free|none|2|early|premium": {
-          "bet": 2.0
+          "bet": 3.0
         },
         "post_reveal|free|none|2|early|strong": {
-          "bet": 8.0
+          "bet": 9.0
+        },
+        "post_reveal|free|none|2|late|medium": {
+          "bet": 1.0,
+          "check": 3.0
         },
         "post_reveal|free|none|2|late|premium": {
-          "bet": 2.0
+          "bet": 4.0
         },
         "post_reveal|free|none|2|late|strong": {
-          "bet": 2.0
+          "bet": 8.0
         },
         "post_reveal|free|none|2|middle|medium": {
           "bet": 2.0,
@@ -1025,16 +1674,19 @@
           "bet": 2.0
         },
         "post_reveal|free|none|2|middle|strong": {
-          "bet": 2.0
-        },
-        "post_reveal|free|none|2|middle|weak": {
-          "check": 4.0
-        },
-        "post_reveal|free|none|3|early|premium": {
           "bet": 4.0
         },
+        "post_reveal|free|none|2|middle|weak": {
+          "check": 5.0
+        },
+        "post_reveal|free|none|3|early|premium": {
+          "bet": 5.0
+        },
         "post_reveal|free|none|3|early|strong": {
-          "bet": 1.0,
+          "bet": 2.0,
+          "check": 3.0
+        },
+        "post_reveal|free|none|3|early|weak": {
           "check": 1.0
         },
         "post_reveal|free|none|3|late|strong": {
@@ -1042,40 +1694,67 @@
           "check": 1.0
         },
         "post_reveal|free|none|3|middle|premium": {
-          "bet": 1.0
+          "bet": 2.0
         },
         "post_reveal|free|none|4|early|medium": {
           "check": 1.0
         },
+        "post_reveal|free|none|4|early|premium": {
+          "bet": 1.0
+        },
         "post_reveal|free|none|4|early|strong": {
-          "check": 1.0
+          "check": 2.0
         },
         "pre_reveal|facing|all_in|2|late|medium": {
           "fold": 2.0
         },
         "pre_reveal|facing|all_in|2|late|strong": {
+          "call": 1.0,
           "raise": 1.0
+        },
+        "pre_reveal|facing|all_in|3|late|medium": {
+          "fold": 1.0
         },
         "pre_reveal|facing|all_in|3|late|premium": {
           "raise": 1.0
         },
+        "pre_reveal|facing|all_in|3|late|strong": {
+          "call": 1.0
+        },
         "pre_reveal|facing|all_in|3|late|weak": {
           "fold": 1.0
+        },
+        "pre_reveal|facing|all_in|4|early|premium": {
+          "raise": 1.0
         },
         "pre_reveal|facing|all_in|4|late|medium": {
           "fold": 1.0
         },
         "pre_reveal|facing|all_in|5|middle|strong": {
+          "call": 1.0,
+          "fold": 2.0
+        },
+        "pre_reveal|facing|all_in|5|middle|weak": {
           "fold": 1.0
         },
         "pre_reveal|facing|large|2|early|premium": {
+          "call": 1.0,
           "raise": 2.0
         },
         "pre_reveal|facing|large|2|early|strong": {
           "raise": 1.0
         },
+        "pre_reveal|facing|large|2|late|medium": {
+          "call": 1.0
+        },
         "pre_reveal|facing|large|2|late|strong": {
           "raise": 1.0
+        },
+        "pre_reveal|facing|large|2|late|weak": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|large|2|middle|strong": {
+          "raise": 2.0
         },
         "pre_reveal|facing|large|3|early|premium": {
           "call": 1.0,
@@ -1100,22 +1779,38 @@
           "raise": 1.0
         },
         "pre_reveal|facing|large|3|middle|strong": {
-          "call": 7.0,
+          "call": 8.0,
           "fold": 2.0
         },
         "pre_reveal|facing|large|3|middle|weak": {
           "fold": 2.0
         },
+        "pre_reveal|facing|large|4|late|medium": {
+          "fold": 2.0
+        },
         "pre_reveal|facing|large|4|late|strong": {
           "call": 1.0
         },
+        "pre_reveal|facing|large|4|middle|strong": {
+          "call": 1.0
+        },
         "pre_reveal|facing|large|5|late|medium": {
+          "fold": 2.0
+        },
+        "pre_reveal|facing|large|5|middle|strong": {
           "fold": 1.0
         },
+        "pre_reveal|facing|medium|2|early|medium": {
+          "call": 1.0
+        },
         "pre_reveal|facing|medium|2|early|strong": {
+          "call": 1.0,
           "raise": 4.0
         },
         "pre_reveal|facing|medium|2|late|strong": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|medium|2|middle|strong": {
           "call": 1.0
         },
         "pre_reveal|facing|medium|3|early|premium": {
@@ -1123,6 +1818,15 @@
         },
         "pre_reveal|facing|medium|3|late|strong": {
           "call": 1.0
+        },
+        "pre_reveal|facing|medium|3|middle|strong": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|medium|4|late|strong": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|overbet|2|early|premium": {
+          "raise": 2.0
         },
         "pre_reveal|facing|overbet|2|early|strong": {
           "raise": 2.0
@@ -1137,29 +1841,48 @@
           "raise": 1.0
         },
         "pre_reveal|facing|overbet|3|early|strong": {
-          "call": 1.0
+          "call": 2.0
         },
         "pre_reveal|facing|overbet|3|late|medium": {
           "fold": 4.0
         },
+        "pre_reveal|facing|overbet|3|late|premium": {
+          "raise": 2.0
+        },
         "pre_reveal|facing|overbet|3|late|strong": {
-          "call": 1.0,
+          "call": 2.0,
           "fold": 1.0
         },
         "pre_reveal|facing|overbet|4|early|premium": {
           "raise": 1.0
         },
-        "pre_reveal|facing|overbet|4|late|strong": {
+        "pre_reveal|facing|overbet|4|late|medium": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|overbet|4|late|premium": {
           "call": 1.0
         },
+        "pre_reveal|facing|overbet|4|late|strong": {
+          "call": 2.0,
+          "fold": 3.0
+        },
         "pre_reveal|facing|overbet|4|late|weak": {
-          "fold": 2.0
+          "fold": 3.0
+        },
+        "pre_reveal|facing|overbet|4|middle|premium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|overbet|4|middle|strong": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|overbet|5|middle|medium": {
+          "fold": 1.0
         },
         "pre_reveal|facing|overbet|5|middle|strong": {
           "call": 1.0
         },
         "pre_reveal|facing|overbet|5|middle|weak": {
-          "fold": 2.0
+          "fold": 3.0
         },
         "pre_reveal|facing|small|3|late|strong": {
           "call": 1.0
@@ -1167,14 +1890,27 @@
         "pre_reveal|facing|small|4|early|strong": {
           "call": 1.0
         },
+        "pre_reveal|facing|unknown|2|early|medium": {
+          "call": 4.0
+        },
+        "pre_reveal|facing|unknown|2|early|premium": {
+          "raise": 3.0
+        },
+        "pre_reveal|facing|unknown|2|early|strong": {
+          "call": 6.0,
+          "raise": 3.0
+        },
+        "pre_reveal|facing|unknown|2|early|weak": {
+          "fold": 4.0
+        },
         "pre_reveal|facing|unknown|2|late|medium": {
-          "raise": 2.0
+          "raise": 3.0
         },
         "pre_reveal|facing|unknown|2|late|premium": {
-          "raise": 2.0
+          "raise": 3.0
         },
         "pre_reveal|facing|unknown|2|late|strong": {
-          "raise": 4.0
+          "raise": 9.0
         },
         "pre_reveal|facing|unknown|2|middle|medium": {
           "call": 1.0
@@ -1200,29 +1936,33 @@
           "fold": 5.0
         },
         "pre_reveal|facing|unknown|3|late|premium": {
-          "raise": 3.0
+          "raise": 4.0
+        },
+        "pre_reveal|facing|unknown|3|late|weak": {
+          "fold": 1.0
         },
         "pre_reveal|facing|unknown|3|middle|medium": {
-          "fold": 1.0
+          "fold": 2.0
         },
         "pre_reveal|facing|unknown|3|middle|strong": {
-          "call": 3.0,
-          "fold": 1.0
+          "call": 6.0,
+          "fold": 2.0
         },
         "pre_reveal|facing|unknown|3|middle|weak": {
           "fold": 1.0
         },
         "pre_reveal|facing|unknown|4|early|medium": {
-          "fold": 5.0
+          "fold": 6.0
         },
         "pre_reveal|facing|unknown|4|early|premium": {
           "raise": 2.0
         },
         "pre_reveal|facing|unknown|4|early|strong": {
-          "fold": 2.0
+          "call": 2.0,
+          "fold": 3.0
         },
         "pre_reveal|facing|unknown|4|early|weak": {
-          "fold": 1.0
+          "fold": 3.0
         },
         "pre_reveal|facing|unknown|4|late|strong": {
           "fold": 1.0
@@ -1230,37 +1970,43 @@
         "pre_reveal|facing|unknown|4|middle|medium": {
           "fold": 2.0
         },
+        "pre_reveal|facing|unknown|4|middle|premium": {
+          "raise": 1.0
+        },
         "pre_reveal|facing|unknown|4|middle|strong": {
-          "call": 1.0
+          "call": 2.0
         },
         "pre_reveal|facing|unknown|4|middle|weak": {
           "fold": 1.0
         },
         "pre_reveal|facing|unknown|5|early|medium": {
-          "fold": 1.0
+          "fold": 3.0
         },
         "pre_reveal|facing|unknown|5|early|premium": {
-          "call": 2.0
+          "call": 4.0
         },
         "pre_reveal|facing|unknown|5|early|strong": {
           "call": 1.0
         },
         "pre_reveal|facing|unknown|5|early|weak": {
-          "fold": 2.0
+          "fold": 3.0
         },
         "pre_reveal|facing|unknown|5|middle|strong": {
           "fold": 1.0
         },
         "pre_reveal|facing|unknown|6+|early|medium": {
-          "fold": 1.0
+          "fold": 3.0
         },
         "pre_reveal|facing|unknown|6+|early|premium": {
           "raise": 1.0
         },
         "pre_reveal|free|none|2|late|weak": {
-          "check": 5.0
+          "check": 6.0
         },
         "pre_reveal|free|none|3|late|medium": {
+          "check": 1.0
+        },
+        "pre_reveal|free|none|3|late|weak": {
           "check": 1.0
         },
         "pre_reveal|free|none|4|late|strong": {
@@ -1268,7 +2014,7 @@
         }
       },
       "name": "Miles",
-      "observations": 205.0
+      "observations": 344.0
     },
     "Rhea": {
       "alpha": 0.75,
@@ -1279,28 +2025,40 @@
         "post_reveal|facing|large|2|late|premium": {
           "raise": 1.0
         },
+        "post_reveal|facing|large|2|middle|premium": {
+          "raise": 1.0
+        },
+        "post_reveal|facing|large|3|late|strong": {
+          "call": 1.0
+        },
+        "post_reveal|facing|large|4|early|premium": {
+          "call": 1.0
+        },
         "post_reveal|facing|large|4|middle|strong": {
           "call": 1.0
         },
+        "post_reveal|facing|medium|2|early|medium": {
+          "fold": 2.0
+        },
         "post_reveal|facing|medium|2|early|premium": {
-          "call": 2.0
+          "call": 5.0
         },
         "post_reveal|facing|medium|2|early|strong": {
-          "call": 1.0,
+          "call": 5.0,
           "fold": 2.0
         },
         "post_reveal|facing|medium|2|early|weak": {
-          "fold": 2.0
+          "fold": 4.0
         },
         "post_reveal|facing|medium|2|late|medium": {
           "raise": 1.0
         },
         "post_reveal|facing|medium|2|late|premium": {
-          "call": 3.0,
-          "raise": 4.0
+          "call": 4.0,
+          "raise": 6.0
         },
         "post_reveal|facing|medium|2|late|strong": {
-          "call": 2.0
+          "call": 4.0
         },
         "post_reveal|facing|medium|2|late|weak": {
           "fold": 2.0
@@ -1324,8 +2082,11 @@
           "raise": 1.0
         },
         "post_reveal|facing|medium|3|middle|premium": {
-          "call": 1.0,
+          "call": 2.0,
           "raise": 1.0
+        },
+        "post_reveal|facing|medium|4|early|premium": {
+          "call": 2.0
         },
         "post_reveal|facing|medium|4|early|weak": {
           "fold": 1.0
@@ -1345,31 +2106,41 @@
         "post_reveal|facing|small|2|middle|premium": {
           "call": 1.0
         },
+        "post_reveal|facing|small|3|late|premium": {
+          "call": 1.0
+        },
+        "post_reveal|facing|small|3|middle|premium": {
+          "raise": 1.0
+        },
         "post_reveal|free|none|2|early|medium": {
-          "check": 2.0
+          "check": 6.0
         },
         "post_reveal|free|none|2|early|premium": {
-          "bet": 3.0,
-          "check": 2.0
+          "bet": 8.0,
+          "check": 7.0
         },
         "post_reveal|free|none|2|early|strong": {
-          "check": 4.0
+          "check": 10.0
         },
         "post_reveal|free|none|2|early|weak": {
-          "check": 4.0
+          "check": 6.0
         },
         "post_reveal|free|none|2|late|premium": {
-          "bet": 4.0,
-          "check": 1.0
+          "bet": 8.0,
+          "check": 2.0
         },
         "post_reveal|free|none|2|late|strong": {
-          "check": 3.0
+          "check": 5.0
         },
         "post_reveal|free|none|2|middle|medium": {
-          "check": 1.0
+          "check": 2.0
         },
         "post_reveal|free|none|2|middle|premium": {
+          "bet": 1.0,
           "check": 2.0
+        },
+        "post_reveal|free|none|2|middle|strong": {
+          "check": 1.0
         },
         "post_reveal|free|none|2|middle|weak": {
           "check": 2.0
@@ -1388,14 +2159,17 @@
           "check": 1.0
         },
         "post_reveal|free|none|3|late|premium": {
-          "bet": 2.0,
+          "bet": 3.0,
           "check": 1.0
         },
         "post_reveal|free|none|3|late|strong": {
-          "check": 1.0
+          "check": 2.0
         },
         "post_reveal|free|none|3|middle|premium": {
-          "bet": 1.0
+          "bet": 3.0
+        },
+        "post_reveal|free|none|4|early|premium": {
+          "check": 3.0
         },
         "post_reveal|free|none|4|middle|strong": {
           "check": 1.0
@@ -1406,8 +2180,29 @@
         "pre_reveal|facing|all_in|2|late|premium": {
           "call": 1.0
         },
+        "pre_reveal|facing|all_in|2|late|weak": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|all_in|3|late|medium": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|all_in|3|late|strong": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|all_in|4|late|medium": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|all_in|4|late|strong": {
+          "call": 1.0
+        },
         "pre_reveal|facing|all_in|4|middle|premium": {
-          "raise": 1.0
+          "raise": 2.0
+        },
+        "pre_reveal|facing|all_in|5|late|premium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|all_in|5|middle|medium": {
+          "fold": 2.0
         },
         "pre_reveal|facing|large|2|early|premium": {
           "call": 1.0
@@ -1416,39 +2211,52 @@
           "call": 1.0
         },
         "pre_reveal|facing|large|2|late|medium": {
-          "fold": 6.0
+          "fold": 16.0
         },
         "pre_reveal|facing|large|2|late|premium": {
-          "call": 1.0
+          "call": 5.0,
+          "raise": 5.0
         },
         "pre_reveal|facing|large|2|late|strong": {
-          "call": 1.0,
-          "fold": 9.0
+          "call": 3.0,
+          "fold": 11.0
         },
         "pre_reveal|facing|large|2|late|weak": {
-          "fold": 5.0
+          "fold": 15.0
         },
         "pre_reveal|facing|large|3|early|premium": {
-          "raise": 2.0
+          "raise": 3.0
+        },
+        "pre_reveal|facing|large|3|early|strong": {
+          "call": 1.0
         },
         "pre_reveal|facing|large|3|late|medium": {
-          "fold": 2.0
+          "fold": 4.0
         },
         "pre_reveal|facing|large|3|late|premium": {
           "call": 2.0
         },
         "pre_reveal|facing|large|3|late|strong": {
           "call": 1.0,
-          "fold": 4.0
+          "fold": 5.0
         },
         "pre_reveal|facing|large|3|late|weak": {
           "fold": 3.0
         },
-        "pre_reveal|facing|large|4|late|medium": {
+        "pre_reveal|facing|large|3|middle|premium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|large|3|middle|strong": {
           "fold": 1.0
         },
-        "pre_reveal|facing|large|4|late|weak": {
+        "pre_reveal|facing|large|4|late|medium": {
           "fold": 3.0
+        },
+        "pre_reveal|facing|large|4|late|premium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|large|4|late|weak": {
+          "fold": 4.0
         },
         "pre_reveal|facing|large|5|middle|medium": {
           "fold": 1.0
@@ -1457,32 +2265,56 @@
           "fold": 1.0
         },
         "pre_reveal|facing|medium|2|early|premium": {
-          "call": 4.0
+          "call": 5.0
         },
         "pre_reveal|facing|medium|2|early|strong": {
-          "call": 2.0
+          "call": 5.0
+        },
+        "pre_reveal|facing|medium|2|late|premium": {
+          "call": 1.0
         },
         "pre_reveal|facing|medium|2|middle|premium": {
           "call": 1.0
         },
         "pre_reveal|facing|medium|2|middle|strong": {
-          "call": 1.0
+          "call": 2.0
         },
         "pre_reveal|facing|medium|3|middle|premium": {
-          "call": 1.0
+          "call": 1.0,
+          "raise": 1.0
         },
         "pre_reveal|facing|medium|4|late|strong": {
           "fold": 1.0
         },
+        "pre_reveal|facing|overbet|2|early|premium": {
+          "raise": 1.0
+        },
         "pre_reveal|facing|overbet|2|early|strong": {
-          "call": 1.0,
+          "call": 2.0,
           "raise": 1.0
         },
         "pre_reveal|facing|overbet|2|late|medium": {
-          "fold": 2.0
+          "fold": 5.0
+        },
+        "pre_reveal|facing|overbet|2|late|premium": {
+          "call": 1.0,
+          "raise": 5.0
+        },
+        "pre_reveal|facing|overbet|2|late|strong": {
+          "call": 2.0,
+          "fold": 1.0
+        },
+        "pre_reveal|facing|overbet|2|late|weak": {
+          "fold": 3.0
+        },
+        "pre_reveal|facing|overbet|3|early|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|overbet|3|early|strong": {
+          "call": 1.0
         },
         "pre_reveal|facing|overbet|3|late|medium": {
-          "fold": 3.0
+          "fold": 5.0
         },
         "pre_reveal|facing|overbet|3|late|strong": {
           "fold": 2.0
@@ -1497,21 +2329,29 @@
           "fold": 1.0
         },
         "pre_reveal|facing|overbet|4|late|medium": {
-          "fold": 1.0
+          "fold": 2.0
+        },
+        "pre_reveal|facing|overbet|4|late|premium": {
+          "call": 1.0
         },
         "pre_reveal|facing|overbet|4|late|strong": {
-          "call": 1.0
+          "call": 1.0,
+          "fold": 1.0
         },
         "pre_reveal|facing|overbet|4|middle|medium": {
           "fold": 1.0
         },
         "pre_reveal|facing|overbet|4|middle|premium": {
-          "call": 1.0
+          "call": 1.0,
+          "raise": 3.0
         },
         "pre_reveal|facing|overbet|4|middle|weak": {
           "fold": 1.0
         },
         "pre_reveal|facing|overbet|5|late|medium": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|overbet|6+|early|medium": {
           "fold": 1.0
         },
         "pre_reveal|facing|overbet|6+|early|strong": {
@@ -1520,138 +2360,166 @@
         "pre_reveal|facing|overbet|6+|early|weak": {
           "fold": 1.0
         },
+        "pre_reveal|facing|small|4|middle|premium": {
+          "call": 1.0
+        },
         "pre_reveal|facing|unknown|2|early|medium": {
-          "fold": 6.0
+          "fold": 24.0
         },
         "pre_reveal|facing|unknown|2|early|premium": {
-          "call": 4.0,
-          "raise": 3.0
+          "call": 5.0,
+          "raise": 5.0
         },
         "pre_reveal|facing|unknown|2|early|strong": {
-          "call": 2.0,
-          "fold": 7.0
+          "call": 7.0,
+          "fold": 20.0
         },
         "pre_reveal|facing|unknown|2|early|weak": {
-          "fold": 8.0
+          "fold": 18.0
         },
         "pre_reveal|facing|unknown|2|late|medium": {
           "fold": 1.0
         },
         "pre_reveal|facing|unknown|2|late|premium": {
           "call": 1.0,
-          "raise": 1.0
+          "raise": 3.0
         },
         "pre_reveal|facing|unknown|2|late|strong": {
           "fold": 1.0
         },
         "pre_reveal|facing|unknown|2|late|weak": {
-          "fold": 2.0
+          "fold": 3.0
         },
         "pre_reveal|facing|unknown|2|middle|medium": {
-          "fold": 5.0
+          "fold": 7.0
         },
         "pre_reveal|facing|unknown|2|middle|premium": {
           "call": 2.0
         },
         "pre_reveal|facing|unknown|2|middle|strong": {
-          "call": 2.0,
+          "call": 3.0,
           "fold": 7.0
         },
         "pre_reveal|facing|unknown|2|middle|weak": {
           "fold": 4.0
         },
         "pre_reveal|facing|unknown|3|early|medium": {
-          "fold": 4.0
+          "fold": 6.0
         },
         "pre_reveal|facing|unknown|3|early|premium": {
-          "call": 4.0,
-          "raise": 4.0
+          "call": 5.0,
+          "raise": 6.0
         },
         "pre_reveal|facing|unknown|3|early|strong": {
           "call": 1.0,
-          "fold": 10.0,
+          "fold": 13.0,
           "raise": 1.0
         },
         "pre_reveal|facing|unknown|3|early|weak": {
           "fold": 6.0
         },
         "pre_reveal|facing|unknown|3|late|medium": {
-          "fold": 1.0
+          "fold": 4.0
         },
         "pre_reveal|facing|unknown|3|late|premium": {
-          "call": 2.0
+          "call": 2.0,
+          "raise": 1.0
         },
         "pre_reveal|facing|unknown|3|late|strong": {
-          "fold": 4.0
+          "fold": 5.0
         },
         "pre_reveal|facing|unknown|3|late|weak": {
           "fold": 3.0
         },
         "pre_reveal|facing|unknown|3|middle|medium": {
-          "fold": 6.0
+          "fold": 8.0
         },
         "pre_reveal|facing|unknown|3|middle|premium": {
           "call": 4.0,
-          "raise": 1.0
+          "raise": 2.0
         },
         "pre_reveal|facing|unknown|3|middle|strong": {
-          "fold": 8.0
+          "fold": 9.0
         },
         "pre_reveal|facing|unknown|3|middle|weak": {
           "fold": 1.0
         },
         "pre_reveal|facing|unknown|4|early|medium": {
-          "fold": 1.0
+          "fold": 2.0
         },
         "pre_reveal|facing|unknown|4|early|premium": {
           "raise": 1.0
         },
         "pre_reveal|facing|unknown|4|early|strong": {
-          "call": 2.0,
-          "fold": 3.0,
+          "call": 3.0,
+          "fold": 7.0,
           "raise": 1.0
         },
         "pre_reveal|facing|unknown|4|early|weak": {
           "fold": 5.0
         },
+        "pre_reveal|facing|unknown|4|late|medium": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|unknown|4|late|strong": {
+          "fold": 2.0
+        },
+        "pre_reveal|facing|unknown|4|late|weak": {
+          "fold": 1.0
+        },
+        "pre_reveal|facing|unknown|4|middle|medium": {
+          "fold": 3.0
+        },
         "pre_reveal|facing|unknown|4|middle|premium": {
+          "call": 1.0,
           "raise": 1.0
         },
         "pre_reveal|facing|unknown|4|middle|strong": {
           "fold": 1.0
         },
+        "pre_reveal|facing|unknown|4|middle|weak": {
+          "fold": 1.0
+        },
         "pre_reveal|facing|unknown|5|early|medium": {
-          "fold": 3.0
+          "fold": 4.0
         },
         "pre_reveal|facing|unknown|5|early|premium": {
           "raise": 1.0
         },
         "pre_reveal|facing|unknown|5|early|strong": {
-          "fold": 4.0
+          "call": 1.0,
+          "fold": 7.0
         },
         "pre_reveal|facing|unknown|5|early|weak": {
-          "fold": 1.0
+          "fold": 5.0
         },
         "pre_reveal|facing|unknown|5|middle|medium": {
           "fold": 2.0
         },
-        "pre_reveal|facing|unknown|6+|early|medium": {
-          "fold": 2.0
-        },
-        "pre_reveal|facing|unknown|6+|early|strong": {
-          "fold": 2.0
-        },
-        "pre_reveal|facing|unknown|6+|early|weak": {
+        "pre_reveal|facing|unknown|5|middle|weak": {
           "fold": 1.0
         },
+        "pre_reveal|facing|unknown|6+|early|medium": {
+          "fold": 4.0
+        },
+        "pre_reveal|facing|unknown|6+|early|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|unknown|6+|early|strong": {
+          "call": 1.0,
+          "fold": 5.0
+        },
+        "pre_reveal|facing|unknown|6+|early|weak": {
+          "fold": 4.0
+        },
         "pre_reveal|free|none|2|late|medium": {
-          "check": 2.0
+          "check": 7.0
         },
         "pre_reveal|free|none|2|late|strong": {
-          "check": 5.0
+          "check": 9.0
         },
         "pre_reveal|free|none|2|late|weak": {
-          "check": 8.0
+          "check": 10.0
         },
         "pre_reveal|free|none|3|late|medium": {
           "check": 2.0
@@ -1667,7 +2535,7 @@
         }
       },
       "name": "Rhea",
-      "observations": 329.0
+      "observations": 599.0
     },
     "Theo": {
       "alpha": 0.75,
@@ -1676,16 +2544,26 @@
           "call": 1.0
         },
         "post_reveal|facing|large|2|early|strong": {
-          "call": 1.0
+          "call": 4.0
         },
         "post_reveal|facing|large|2|early|weak": {
           "fold": 1.0
         },
-        "post_reveal|facing|large|2|late|strong": {
+        "post_reveal|facing|large|2|late|medium": {
           "call": 1.0
         },
+        "post_reveal|facing|large|2|late|premium": {
+          "call": 1.0,
+          "raise": 2.0
+        },
+        "post_reveal|facing|large|2|late|strong": {
+          "call": 2.0
+        },
         "post_reveal|facing|large|2|middle|medium": {
-          "call": 1.0
+          "call": 2.0
+        },
+        "post_reveal|facing|large|2|middle|premium": {
+          "raise": 1.0
         },
         "post_reveal|facing|large|3|early|medium": {
           "call": 1.0
@@ -1693,14 +2571,31 @@
         "post_reveal|facing|large|3|early|weak": {
           "call": 1.0
         },
-        "post_reveal|facing|medium|2|early|medium": {
+        "post_reveal|facing|large|3|middle|premium": {
+          "call": 1.0,
+          "raise": 1.0
+        },
+        "post_reveal|facing|large|3|middle|strong": {
           "call": 1.0
+        },
+        "post_reveal|facing|large|4|late|medium": {
+          "call": 1.0
+        },
+        "post_reveal|facing|medium|2|early|medium": {
+          "call": 3.0
+        },
+        "post_reveal|facing|medium|2|early|premium": {
+          "call": 2.0,
+          "raise": 1.0
         },
         "post_reveal|facing|medium|2|late|strong": {
-          "call": 1.0
+          "call": 2.0
         },
         "post_reveal|facing|medium|2|middle|premium": {
-          "call": 1.0
+          "call": 2.0
+        },
+        "post_reveal|facing|medium|2|middle|strong": {
+          "raise": 1.0
         },
         "post_reveal|facing|medium|3|early|premium": {
           "raise": 1.0
@@ -1710,21 +2605,35 @@
           "raise": 1.0
         },
         "post_reveal|facing|medium|3|late|premium": {
-          "call": 1.0
+          "call": 2.0
         },
         "post_reveal|facing|medium|3|late|weak": {
+          "call": 1.0,
           "fold": 1.0
+        },
+        "post_reveal|facing|medium|3|middle|medium": {
+          "call": 4.0
         },
         "post_reveal|facing|medium|3|middle|strong": {
           "call": 1.0
         },
-        "post_reveal|facing|medium|4|late|strong": {
+        "post_reveal|facing|medium|4|early|medium": {
           "call": 1.0
+        },
+        "post_reveal|facing|medium|4|late|premium": {
+          "call": 1.0
+        },
+        "post_reveal|facing|medium|4|late|strong": {
+          "call": 1.0,
+          "raise": 1.0
         },
         "post_reveal|facing|medium|4|middle|strong": {
           "call": 1.0
         },
         "post_reveal|facing|overbet|2|early|medium": {
+          "call": 2.0
+        },
+        "post_reveal|facing|overbet|2|middle|strong": {
           "call": 1.0
         },
         "post_reveal|facing|small|2|early|premium": {
@@ -1736,7 +2645,19 @@
         "post_reveal|facing|small|2|middle|weak": {
           "fold": 1.0
         },
+        "post_reveal|facing|small|4|middle|premium": {
+          "call": 1.0
+        },
+        "post_reveal|free|none|2|early|medium": {
+          "check": 1.0
+        },
         "post_reveal|free|none|2|early|premium": {
+          "check": 2.0
+        },
+        "post_reveal|free|none|2|early|strong": {
+          "check": 1.0
+        },
+        "post_reveal|free|none|2|late|medium": {
           "check": 1.0
         },
         "post_reveal|free|none|2|late|weak": {
@@ -1745,26 +2666,53 @@
         "post_reveal|free|none|2|middle|premium": {
           "bet": 1.0
         },
-        "post_reveal|free|none|3|early|medium": {
+        "post_reveal|free|none|2|middle|strong": {
           "bet": 1.0
         },
-        "post_reveal|free|none|3|early|strong": {
+        "post_reveal|free|none|3|early|medium": {
+          "bet": 2.0,
           "check": 1.0
+        },
+        "post_reveal|free|none|3|early|premium": {
+          "check": 2.0
+        },
+        "post_reveal|free|none|3|early|strong": {
+          "check": 5.0
         },
         "post_reveal|free|none|3|early|weak": {
           "bet": 1.0,
           "check": 3.0
         },
+        "post_reveal|free|none|3|late|medium": {
+          "check": 2.0
+        },
+        "post_reveal|free|none|3|late|premium": {
+          "bet": 1.0
+        },
         "post_reveal|free|none|3|late|strong": {
+          "check": 3.0
+        },
+        "post_reveal|free|none|3|middle|medium": {
+          "bet": 2.0,
+          "check": 1.0
+        },
+        "post_reveal|free|none|3|middle|premium": {
+          "check": 2.0
+        },
+        "post_reveal|free|none|3|middle|strong": {
+          "bet": 1.0,
           "check": 2.0
         },
         "post_reveal|free|none|3|middle|weak": {
           "check": 1.0
         },
         "post_reveal|free|none|4|early|medium": {
-          "check": 1.0
+          "check": 2.0
         },
         "post_reveal|free|none|4|early|strong": {
+          "bet": 1.0
+        },
+        "post_reveal|free|none|4|early|weak": {
           "bet": 1.0
         },
         "post_reveal|free|none|4|middle|medium": {
@@ -1773,38 +2721,83 @@
         "pre_reveal|facing|all_in|3|late|weak": {
           "fold": 1.0
         },
+        "pre_reveal|facing|all_in|4|middle|medium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|all_in|4|middle|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|all_in|4|middle|strong": {
+          "call": 1.0
+        },
         "pre_reveal|facing|all_in|4|middle|weak": {
           "raise": 1.0
         },
-        "pre_reveal|facing|large|2|late|premium": {
+        "pre_reveal|facing|all_in|5|middle|premium": {
           "call": 1.0
         },
-        "pre_reveal|facing|large|2|middle|premium": {
+        "pre_reveal|facing|large|2|early|medium": {
           "call": 1.0
+        },
+        "pre_reveal|facing|large|2|late|medium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|large|2|late|premium": {
+          "call": 2.0
+        },
+        "pre_reveal|facing|large|2|late|strong": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|large|2|middle|premium": {
+          "call": 2.0
         },
         "pre_reveal|facing|large|2|middle|strong": {
           "call": 1.0
         },
-        "pre_reveal|facing|large|3|early|strong": {
+        "pre_reveal|facing|large|3|early|medium": {
+          "call": 1.0,
           "raise": 1.0
+        },
+        "pre_reveal|facing|large|3|early|strong": {
+          "raise": 2.0
         },
         "pre_reveal|facing|large|3|early|weak": {
           "call": 1.0
         },
+        "pre_reveal|facing|large|3|late|premium": {
+          "call": 1.0
+        },
         "pre_reveal|facing|large|3|late|strong": {
-          "call": 3.0
+          "call": 5.0,
+          "raise": 1.0
         },
         "pre_reveal|facing|large|3|middle|premium": {
-          "call": 1.0
+          "call": 2.0,
+          "raise": 1.0
         },
         "pre_reveal|facing|large|3|middle|strong": {
           "raise": 1.0
         },
+        "pre_reveal|facing|large|3|middle|weak": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|large|4|early|medium": {
+          "call": 2.0
+        },
         "pre_reveal|facing|large|4|early|strong": {
           "call": 2.0
         },
+        "pre_reveal|facing|large|4|late|premium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|large|4|late|strong": {
+          "call": 1.0
+        },
         "pre_reveal|facing|large|4|late|weak": {
           "fold": 1.0
+        },
+        "pre_reveal|facing|large|4|middle|premium": {
+          "call": 1.0
         },
         "pre_reveal|facing|medium|2|early|strong": {
           "call": 1.0
@@ -1812,40 +2805,69 @@
         "pre_reveal|facing|medium|2|middle|weak": {
           "fold": 1.0
         },
+        "pre_reveal|facing|medium|3|early|medium": {
+          "call": 3.0
+        },
         "pre_reveal|facing|overbet|2|early|strong": {
           "call": 1.0,
           "raise": 1.0
         },
         "pre_reveal|facing|overbet|2|late|medium": {
-          "call": 1.0
+          "call": 2.0
         },
         "pre_reveal|facing|overbet|2|late|strong": {
-          "raise": 1.0
+          "raise": 2.0
+        },
+        "pre_reveal|facing|overbet|2|middle|strong": {
+          "call": 1.0
         },
         "pre_reveal|facing|overbet|2|middle|weak": {
           "fold": 1.0
         },
+        "pre_reveal|facing|overbet|3|early|medium": {
+          "call": 2.0,
+          "raise": 1.0
+        },
         "pre_reveal|facing|overbet|3|early|strong": {
-          "call": 1.0
+          "call": 5.0
         },
         "pre_reveal|facing|overbet|3|early|weak": {
           "fold": 1.0,
           "raise": 1.0
         },
+        "pre_reveal|facing|overbet|3|late|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|overbet|3|late|strong": {
+          "call": 2.0,
+          "raise": 2.0
+        },
         "pre_reveal|facing|overbet|3|late|weak": {
+          "fold": 3.0,
           "raise": 1.0
         },
         "pre_reveal|facing|overbet|3|middle|premium": {
           "call": 1.0
         },
+        "pre_reveal|facing|overbet|4|early|medium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|overbet|4|early|premium": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|overbet|4|late|medium": {
+          "call": 2.0
+        },
         "pre_reveal|facing|overbet|4|late|premium": {
           "raise": 1.0
         },
         "pre_reveal|facing|overbet|4|late|strong": {
+          "call": 2.0,
           "raise": 1.0
         },
         "pre_reveal|facing|overbet|4|late|weak": {
-          "raise": 1.0
+          "fold": 1.0,
+          "raise": 2.0
         },
         "pre_reveal|facing|overbet|4|middle|premium": {
           "call": 1.0
@@ -1859,7 +2881,14 @@
         "pre_reveal|facing|overbet|6+|early|weak": {
           "raise": 1.0
         },
+        "pre_reveal|facing|small|4|early|strong": {
+          "call": 1.0
+        },
         "pre_reveal|facing|small|4|middle|premium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|unknown|2|late|medium": {
+          "call": 1.0,
           "raise": 1.0
         },
         "pre_reveal|facing|unknown|3|late|medium": {
@@ -1872,17 +2901,19 @@
           "call": 1.0
         },
         "pre_reveal|facing|unknown|3|middle|strong": {
-          "call": 3.0
+          "call": 3.0,
+          "raise": 1.0
         },
         "pre_reveal|facing|unknown|3|middle|weak": {
           "call": 1.0
         },
         "pre_reveal|facing|unknown|4|early|medium": {
-          "call": 1.0
+          "call": 2.0,
+          "raise": 2.0
         },
         "pre_reveal|facing|unknown|4|early|strong": {
-          "call": 1.0,
-          "raise": 2.0
+          "call": 2.0,
+          "raise": 3.0
         },
         "pre_reveal|facing|unknown|4|late|strong": {
           "call": 1.0
@@ -1890,22 +2921,39 @@
         "pre_reveal|facing|unknown|4|middle|medium": {
           "raise": 1.0
         },
-        "pre_reveal|facing|unknown|5|early|strong": {
+        "pre_reveal|facing|unknown|4|middle|premium": {
           "call": 3.0
         },
+        "pre_reveal|facing|unknown|4|middle|strong": {
+          "call": 1.0
+        },
+        "pre_reveal|facing|unknown|4|middle|weak": {
+          "call": 1.0,
+          "fold": 2.0
+        },
+        "pre_reveal|facing|unknown|5|early|medium": {
+          "raise": 1.0
+        },
+        "pre_reveal|facing|unknown|5|early|premium": {
+          "call": 2.0
+        },
+        "pre_reveal|facing|unknown|5|early|strong": {
+          "call": 8.0
+        },
         "pre_reveal|facing|unknown|5|early|weak": {
-          "fold": 1.0
+          "fold": 2.0,
+          "raise": 1.0
         },
         "pre_reveal|facing|unknown|5|middle|premium": {
           "call": 1.0,
           "raise": 1.0
         },
         "pre_reveal|facing|unknown|6+|early|medium": {
-          "call": 1.0
+          "call": 6.0
         },
         "pre_reveal|facing|unknown|6+|early|strong": {
           "call": 1.0,
-          "raise": 1.0
+          "raise": 2.0
         },
         "pre_reveal|facing|unknown|6+|early|weak": {
           "fold": 1.0,
@@ -1913,15 +2961,15 @@
         }
       },
       "name": "Theo",
-      "observations": 99.0
+      "observations": 245.0
     }
   },
   "rules": {
     "amaranth": {
       "codename": "amaranth",
-      "confidence": 0.8067370681679853,
-      "fit_sum": 18.01706659213978,
-      "observations": 19,
+      "confidence": 0.9999995563735837,
+      "fit_sum": 29.835252704136437,
+      "observations": 31,
       "pairwise": [
         {
           "community": 0,
@@ -1937,19 +2985,55 @@
         },
         {
           "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 3
+        },
+        {
+          "community": 0,
+          "loser": 11,
+          "weight": 0.3,
+          "winner": 3
+        },
+        {
+          "community": 0,
+          "loser": 13,
+          "weight": 0.3,
+          "winner": 3
+        },
+        {
+          "community": 0,
           "loser": 3,
           "weight": 0.3,
           "winner": 7
         },
         {
           "community": 0,
-          "loser": 6,
+          "loser": 4,
           "weight": 0.3,
           "winner": 7
         },
         {
           "community": 0,
+          "loser": 6,
+          "weight": 0.6,
+          "winner": 7
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.6,
+          "winner": 7
+        },
+        {
+          "community": 0,
           "loser": 11,
+          "weight": 0.6,
+          "winner": 7
+        },
+        {
+          "community": 0,
+          "loser": 12,
           "weight": 0.3,
           "winner": 7
         },
@@ -1968,7 +3052,7 @@
         {
           "community": 0,
           "loser": 6,
-          "weight": 0.3,
+          "weight": 0.6,
           "winner": 8
         },
         {
@@ -1997,6 +3081,24 @@
         },
         {
           "community": 0,
+          "loser": 1,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 9,
+          "weight": 0.6,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 10,
+          "weight": 0.6,
+          "winner": 11
+        },
+        {
+          "community": 0,
           "loser": 5,
           "weight": 0.3,
           "winner": 12
@@ -2015,6 +3117,12 @@
         },
         {
           "community": 0,
+          "loser": 10,
+          "weight": 0.3,
+          "winner": 12
+        },
+        {
+          "community": 0,
           "loser": 11,
           "weight": 0.3,
           "winner": 12
@@ -2027,7 +3135,31 @@
         },
         {
           "community": 0,
+          "loser": 5,
+          "weight": 0.6,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 6,
+          "weight": 0.3,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.6,
+          "winner": 13
+        },
+        {
+          "community": 0,
           "loser": 9,
+          "weight": 0.3,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 10,
           "weight": 0.3,
           "winner": 13
         },
@@ -2087,13 +3219,55 @@
         },
         {
           "community": 3,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 3,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 3,
+          "loser": 13,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 3,
           "loser": 3,
           "weight": 3.0,
           "winner": 7
         },
         {
           "community": 3,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 3,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 3,
           "loser": 2,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 3,
+          "loser": 5,
+          "weight": 6.0,
+          "winner": 13
+        },
+        {
+          "community": 3,
+          "loser": 10,
           "weight": 3.0,
           "winner": 13
         },
@@ -2134,6 +3308,12 @@
           "winner": 10
         },
         {
+          "community": 6,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
           "community": 7,
           "loser": 6,
           "weight": 3.0,
@@ -2152,6 +3332,18 @@
           "winner": 8
         },
         {
+          "community": 7,
+          "loser": 1,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 7,
+          "loser": 9,
+          "weight": 6.0,
+          "winner": 11
+        },
+        {
           "community": 9,
           "loser": 12,
           "weight": 3.0,
@@ -2164,6 +3356,18 @@
           "winner": 12
         },
         {
+          "community": 10,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 10,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
           "community": 11,
           "loser": 12,
           "weight": 3.0,
@@ -2174,50 +3378,104 @@
           "loser": 9,
           "weight": 3.0,
           "winner": 10
+        },
+        {
+          "community": 12,
+          "loser": 10,
+          "weight": 6.0,
+          "winner": 11
+        },
+        {
+          "community": 13,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 13,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 13,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 13,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 13,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 8
+        },
+        {
+          "community": 13,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 12
         }
       ],
       "posterior": {
-        "center-far-high": 1.4700772246892154e-14,
-        "center-far-low": 6.567406924009988e-18,
-        "center-match-high": 0.0001771935953734461,
-        "center-match-low": 5.0020395826508906e-48,
-        "center-near-high": 2.3322245735200295e-41,
-        "center-near-low": 1.0418954565954679e-44,
-        "community-far-high": 1.6977688250979808e-14,
-        "community-far-low": 1.6977688250979808e-14,
-        "community-near-high": 1.2032685055664043e-44,
-        "community-near-low": 1.2032685055664043e-44,
-        "pair-first-center-far-high": 1.6017485706245704e-11,
-        "pair-first-center-far-low": 7.155634055528455e-15,
-        "pair-first-center-match-high": 0.19306440732951843,
-        "pair-first-center-match-low": 1.0876993634033781e-51,
-        "pair-first-center-near-high": 2.5411164218266963e-38,
-        "pair-first-center-near-low": 1.1352155725661423e-41,
-        "pair-first-community-far-high": 4.140749644901252e-08,
-        "pair-first-community-far-low": 4.140749644901252e-08,
-        "pair-first-raw-low": 1.8005006945288568e-51,
-        "pair-last-center-far-high": 3.1967001360690033e-18,
-        "pair-last-center-far-low": 1.4280903244413931e-21,
-        "pair-last-center-match-high": 3.8530954763998964e-08,
-        "pair-last-center-match-low": 2.1707830846622297e-58,
-        "pair-last-center-near-high": 5.071449639722893e-45,
-        "pair-last-center-near-low": 2.2656138683956052e-48,
-        "pair-last-community-near-high": 1.168901933616268e-51,
-        "pair-last-community-near-low": 1.168901933616268e-51,
-        "pair-last-raw-high": 6.378142081132378e-08,
-        "pair-last-raw-low": 3.593360981086104e-58,
-        "raw-high": 1.3103466913683619e-07,
-        "raw-low": 1.6524909793001223e-54,
-        "standard": 0.8067580828969972
+        "center-far-high": 1.3548981223473303e-30,
+        "center-far-low": 2.704046747098672e-37,
+        "center-match-high": 4.100146770028715e-07,
+        "center-match-low": 4.11031349927678e-74,
+        "center-near-high": 1.9164530766875085e-67,
+        "center-near-low": 3.824773702546904e-74,
+        "community-far-high": 6.232469403847069e-44,
+        "community-far-low": 6.232469403847069e-44,
+        "community-near-high": 2.2132812030000933e-67,
+        "community-near-low": 2.2132812030000933e-67,
+        "pair-first-center-far-high": 3.3045099168099765e-24,
+        "pair-first-center-far-low": 6.594997176484934e-31,
+        "pair-first-center-match-high": 0.9999995895235998,
+        "pair-first-center-match-low": 8.93792482582126e-78,
+        "pair-first-center-near-high": 4.6741065564717404e-61,
+        "pair-first-center-near-low": 9.328378585190743e-68,
+        "pair-first-community-far-high": 3.402567868833722e-34,
+        "pair-first-community-far-low": 3.402567868833722e-34,
+        "pair-first-raw-low": 2.952763548605392e-84,
+        "pair-last-center-far-high": 2.9462418295630658e-34,
+        "pair-last-center-far-low": 5.879981309291286e-41,
+        "pair-last-center-match-high": 8.915817154044167e-11,
+        "pair-last-center-match-low": 7.968893619404438e-88,
+        "pair-last-center-near-high": 4.167349652200791e-71,
+        "pair-last-center-near-low": 8.317015194864886e-78,
+        "pair-last-community-near-high": 9.605188678909748e-78,
+        "pair-last-community-near-low": 9.605188678909748e-78,
+        "pair-last-raw-high": 1.3158515727413117e-20,
+        "pair-last-raw-low": 2.632631070482229e-94,
+        "raw-high": 2.7033291713177392e-20,
+        "raw-low": 2.710032349836728e-87,
+        "standard": 3.7256517936939635e-10
       },
       "version": 1
     },
     "cinnabar": {
       "codename": "cinnabar",
-      "confidence": 0.9992893082898361,
-      "fit_sum": 14.773380850033565,
-      "observations": 15,
+      "confidence": 0.9999999998718122,
+      "fit_sum": 40.383380645375446,
+      "observations": 41,
       "pairwise": [
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.3,
+          "winner": 1
+        },
+        {
+          "community": 0,
+          "loser": 12,
+          "weight": 0.3,
+          "winner": 3
+        },
         {
           "community": 0,
           "loser": 1,
@@ -2232,6 +3490,12 @@
         },
         {
           "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 7
+        },
+        {
+          "community": 0,
           "loser": 1,
           "weight": 0.3,
           "winner": 8
@@ -2239,6 +3503,12 @@
         {
           "community": 0,
           "loser": 3,
+          "weight": 0.3,
+          "winner": 8
+        },
+        {
+          "community": 0,
+          "loser": 5,
           "weight": 0.3,
           "winner": 8
         },
@@ -2262,670 +3532,134 @@
         },
         {
           "community": 0,
+          "loser": 4,
+          "weight": 0.3,
+          "winner": 10
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.3,
+          "winner": 10
+        },
+        {
+          "community": 0,
+          "loser": 1,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 6,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.6,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 10,
+          "weight": 0.6,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 12,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 1,
+          "weight": 0.3,
+          "winner": 12
+        },
+        {
+          "community": 0,
           "loser": 2,
           "weight": 0.3,
           "winner": 12
         },
         {
           "community": 0,
+          "loser": 4,
+          "weight": 0.3,
+          "winner": 12
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.3,
+          "winner": 12
+        },
+        {
+          "community": 0,
           "loser": 8,
-          "weight": 0.6,
+          "weight": 0.8999999999999999,
           "winner": 12
-        },
-        {
-          "community": 0,
-          "loser": 11,
-          "weight": 0.3,
-          "winner": 12
-        },
-        {
-          "community": 0,
-          "loser": 6,
-          "weight": 0.3,
-          "winner": 13
-        },
-        {
-          "community": 0,
-          "loser": 9,
-          "weight": 0.6,
-          "winner": 13
         },
         {
           "community": 0,
           "loser": 10,
           "weight": 0.3,
-          "winner": 13
+          "winner": 12
         },
         {
           "community": 0,
           "loser": 11,
+          "weight": 0.6,
+          "winner": 12
+        },
+        {
+          "community": 0,
+          "loser": 4,
+          "weight": 0.3,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 6,
+          "weight": 0.6,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 1.5,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 9,
           "weight": 0.8999999999999999,
           "winner": 13
         },
         {
           "community": 0,
-          "loser": 12,
-          "weight": 0.3,
-          "winner": 13
-        },
-        {
-          "community": 1,
-          "loser": 9,
-          "weight": 3.0,
-          "winner": 13
-        },
-        {
-          "community": 2,
-          "loser": 1,
-          "weight": 3.0,
-          "winner": 8
-        },
-        {
-          "community": 2,
-          "loser": 3,
-          "weight": 3.0,
-          "winner": 8
-        },
-        {
-          "community": 2,
-          "loser": 7,
-          "weight": 3.0,
-          "winner": 8
-        },
-        {
-          "community": 2,
-          "loser": 8,
-          "weight": 3.0,
-          "winner": 12
-        },
-        {
-          "community": 3,
-          "loser": 12,
-          "weight": 3.0,
-          "winner": 13
-        },
-        {
-          "community": 5,
-          "loser": 6,
-          "weight": 3.0,
-          "winner": 9
-        },
-        {
-          "community": 5,
-          "loser": 11,
-          "weight": 3.0,
-          "winner": 13
-        },
-        {
-          "community": 6,
-          "loser": 11,
-          "weight": 3.0,
-          "winner": 6
-        },
-        {
-          "community": 7,
-          "loser": 11,
-          "weight": 3.0,
-          "winner": 12
-        },
-        {
-          "community": 7,
-          "loser": 10,
-          "weight": 3.0,
-          "winner": 13
-        },
-        {
-          "community": 8,
-          "loser": 1,
-          "weight": 3.0,
-          "winner": 6
-        },
-        {
-          "community": 10,
-          "loser": 3,
-          "weight": 6.0,
-          "winner": 9
-        },
-        {
-          "community": 10,
-          "loser": 2,
-          "weight": 3.0,
-          "winner": 12
-        },
-        {
-          "community": 10,
-          "loser": 8,
-          "weight": 3.0,
-          "winner": 12
-        },
-        {
-          "community": 12,
-          "loser": 9,
-          "weight": 3.0,
-          "winner": 13
-        },
-        {
-          "community": 12,
-          "loser": 11,
-          "weight": 6.0,
-          "winner": 13
-        },
-        {
-          "community": 13,
-          "loser": 6,
-          "weight": 3.0,
-          "winner": 13
-        }
-      ],
-      "posterior": {
-        "center-far-high": 1.821346051067598e-14,
-        "center-far-low": 8.13666143921683e-18,
-        "center-match-high": 9.807405152175645e-08,
-        "center-match-low": 6.197256095217079e-48,
-        "center-near-high": 2.8894999159527046e-41,
-        "center-near-low": 2.8894999159527046e-41,
-        "community-far-high": 4.1979612775836914e-21,
-        "community-far-low": 1.8753926323127266e-24,
-        "community-near-high": 8.378108545482563e-28,
-        "community-near-low": 1.6720664665180218e-34,
-        "pair-first-center-far-high": 1.9844797163815436e-11,
-        "pair-first-center-far-low": 8.865442992409433e-15,
-        "pair-first-center-match-high": 0.00010685831274853165,
-        "pair-first-center-match-low": 6.75232969098406e-45,
-        "pair-first-center-near-high": 3.1483056008676956e-38,
-        "pair-first-center-near-low": 3.1483056008676956e-38,
-        "pair-first-community-far-high": 1.023855922696712e-14,
-        "pair-first-community-far-low": 4.573962757180011e-18,
-        "pair-first-raw-low": 1.1177329607203172e-44,
-        "pair-last-center-far-high": 3.960538311521306e-18,
-        "pair-last-center-far-low": 1.7693265559835234e-21,
-        "pair-last-center-match-high": 2.1326317323956804e-11,
-        "pair-last-center-match-low": 1.347600593364953e-51,
-        "pair-last-center-near-high": 6.283251396163982e-45,
-        "pair-last-center-near-low": 6.283251396163982e-45,
-        "pair-last-community-near-high": 8.138821246926664e-35,
-        "pair-last-community-near-low": 1.624310548149677e-41,
-        "pair-last-raw-high": 7.902172550883812e-08,
-        "pair-last-raw-low": 2.2307228320048877e-51,
-        "raw-high": 0.000363399862299992,
-        "raw-low": 1.0258499985416915e-47,
-        "standard": 0.9995295646879659
-      },
-      "version": 1
-    },
-    "obsidian": {
-      "codename": "obsidian",
-      "confidence": 0.9999996938606264,
-      "fit_sum": 26.592565071304183,
-      "observations": 27,
-      "pairwise": [
-        {
-          "community": 0,
-          "loser": 3,
-          "weight": 0.6,
-          "winner": 1
-        },
-        {
-          "community": 0,
-          "loser": 5,
-          "weight": 0.3,
-          "winner": 1
-        },
-        {
-          "community": 0,
-          "loser": 6,
-          "weight": 0.3,
-          "winner": 1
-        },
-        {
-          "community": 0,
-          "loser": 3,
-          "weight": 0.3,
-          "winner": 2
-        },
-        {
-          "community": 0,
-          "loser": 5,
-          "weight": 0.3,
-          "winner": 2
-        },
-        {
-          "community": 0,
-          "loser": 6,
-          "weight": 0.3,
-          "winner": 2
-        },
-        {
-          "community": 0,
-          "loser": 7,
-          "weight": 0.3,
-          "winner": 2
-        },
-        {
-          "community": 0,
-          "loser": 8,
-          "weight": 0.3,
-          "winner": 2
-        },
-        {
-          "community": 0,
-          "loser": 12,
-          "weight": 0.3,
-          "winner": 2
-        },
-        {
-          "community": 0,
-          "loser": 4,
-          "weight": 0.8999999999999999,
-          "winner": 3
-        },
-        {
-          "community": 0,
-          "loser": 5,
-          "weight": 0.3,
-          "winner": 3
-        },
-        {
-          "community": 0,
-          "loser": 7,
-          "weight": 0.3,
-          "winner": 3
-        },
-        {
-          "community": 0,
-          "loser": 11,
-          "weight": 0.6,
-          "winner": 3
-        },
-        {
-          "community": 0,
-          "loser": 12,
-          "weight": 0.3,
-          "winner": 3
-        },
-        {
-          "community": 0,
-          "loser": 5,
-          "weight": 0.3,
-          "winner": 4
-        },
-        {
-          "community": 0,
-          "loser": 6,
-          "weight": 0.3,
-          "winner": 4
-        },
-        {
-          "community": 0,
-          "loser": 8,
-          "weight": 0.3,
-          "winner": 4
-        },
-        {
-          "community": 0,
           "loser": 10,
           "weight": 0.3,
-          "winner": 4
-        },
-        {
-          "community": 0,
-          "loser": 13,
-          "weight": 0.3,
-          "winner": 4
-        },
-        {
-          "community": 0,
-          "loser": 4,
-          "weight": 0.3,
-          "winner": 5
-        },
-        {
-          "community": 0,
-          "loser": 7,
-          "weight": 0.3,
-          "winner": 5
-        },
-        {
-          "community": 0,
-          "loser": 9,
-          "weight": 0.3,
-          "winner": 5
-        },
-        {
-          "community": 0,
-          "loser": 8,
-          "weight": 0.3,
-          "winner": 7
-        },
-        {
-          "community": 0,
-          "loser": 9,
-          "weight": 0.3,
-          "winner": 7
-        },
-        {
-          "community": 0,
-          "loser": 13,
-          "weight": 0.3,
-          "winner": 7
-        },
-        {
-          "community": 0,
-          "loser": 8,
-          "weight": 0.6,
-          "winner": 11
-        },
-        {
-          "community": 1,
-          "loser": 5,
-          "weight": 3.0,
-          "winner": 2
-        },
-        {
-          "community": 2,
-          "loser": 4,
-          "weight": 3.0,
-          "winner": 3
-        },
-        {
-          "community": 2,
-          "loser": 7,
-          "weight": 3.0,
-          "winner": 3
-        },
-        {
-          "community": 3,
-          "loser": 10,
-          "weight": 3.0,
-          "winner": 4
-        },
-        {
-          "community": 4,
-          "loser": 6,
-          "weight": 3.0,
-          "winner": 1
-        },
-        {
-          "community": 4,
-          "loser": 4,
-          "weight": 3.0,
-          "winner": 3
-        },
-        {
-          "community": 4,
-          "loser": 4,
-          "weight": 3.0,
-          "winner": 5
-        },
-        {
-          "community": 5,
-          "loser": 3,
-          "weight": 3.0,
-          "winner": 1
-        },
-        {
-          "community": 5,
-          "loser": 12,
-          "weight": 3.0,
-          "winner": 2
-        },
-        {
-          "community": 6,
-          "loser": 7,
-          "weight": 3.0,
-          "winner": 5
-        },
-        {
-          "community": 6,
-          "loser": 9,
-          "weight": 3.0,
-          "winner": 5
-        },
-        {
-          "community": 7,
-          "loser": 5,
-          "weight": 3.0,
-          "winner": 4
-        },
-        {
-          "community": 8,
-          "loser": 4,
-          "weight": 3.0,
-          "winner": 3
-        },
-        {
-          "community": 8,
-          "loser": 11,
-          "weight": 3.0,
-          "winner": 3
-        },
-        {
-          "community": 8,
-          "loser": 8,
-          "weight": 3.0,
-          "winner": 7
-        },
-        {
-          "community": 8,
-          "loser": 9,
-          "weight": 3.0,
-          "winner": 7
-        },
-        {
-          "community": 8,
-          "loser": 8,
-          "weight": 6.0,
-          "winner": 11
-        },
-        {
-          "community": 9,
-          "loser": 3,
-          "weight": 3.0,
-          "winner": 1
-        },
-        {
-          "community": 9,
-          "loser": 8,
-          "weight": 3.0,
-          "winner": 4
-        },
-        {
-          "community": 9,
-          "loser": 13,
-          "weight": 3.0,
-          "winner": 7
-        },
-        {
-          "community": 10,
-          "loser": 3,
-          "weight": 3.0,
-          "winner": 2
-        },
-        {
-          "community": 10,
-          "loser": 11,
-          "weight": 3.0,
-          "winner": 3
-        },
-        {
-          "community": 11,
-          "loser": 5,
-          "weight": 3.0,
-          "winner": 1
-        },
-        {
-          "community": 11,
-          "loser": 12,
-          "weight": 3.0,
-          "winner": 3
-        },
-        {
-          "community": 12,
-          "loser": 7,
-          "weight": 3.0,
-          "winner": 2
-        },
-        {
-          "community": 12,
-          "loser": 8,
-          "weight": 3.0,
-          "winner": 2
-        },
-        {
-          "community": 12,
-          "loser": 6,
-          "weight": 3.0,
-          "winner": 4
-        },
-        {
-          "community": 12,
-          "loser": 13,
-          "weight": 3.0,
-          "winner": 4
-        },
-        {
-          "community": 13,
-          "loser": 6,
-          "weight": 3.0,
-          "winner": 2
-        },
-        {
-          "community": 13,
-          "loser": 5,
-          "weight": 3.0,
-          "winner": 3
-        }
-      ],
-      "posterior": {
-        "center-far-high": 3.656589243858744e-34,
-        "center-far-low": 2.0549785420131967e-17,
-        "center-match-high": 2.483079970049439e-74,
-        "center-match-low": 9.865753750608192e-21,
-        "center-near-high": 1.0322271579133937e-77,
-        "center-near-low": 1.1577477603836167e-67,
-        "community-far-high": 2.1159579284745884e-27,
-        "community-far-low": 4.736453207549612e-24,
-        "community-near-high": 5.973187287693766e-71,
-        "community-near-low": 1.3370644901473179e-67,
-        "pair-first-center-far-high": 1.5868850989619228e-44,
-        "pair-first-center-far-low": 8.918187440616195e-28,
-        "pair-first-center-match-high": 4.8140853813900433e-88,
-        "pair-first-center-match-low": 9.583977792421005e-28,
-        "pair-first-center-near-high": 1.0027457007596559e-84,
-        "pair-first-center-near-low": 1.1246813071994657e-74,
-        "pair-first-community-far-high": 4.1023254401678373e-41,
-        "pair-first-community-far-low": 4.1023254401678373e-41,
-        "pair-first-raw-low": 1.7793807420537856e-17,
-        "pair-last-center-far-high": 3.984101308657664e-31,
-        "pair-last-center-far-low": 2.2390381178986273e-14,
-        "pair-last-center-match-high": 2.705483580030284e-71,
-        "pair-last-center-match-low": 5.386131008188208e-11,
-        "pair-last-center-near-high": 5.635363341993308e-68,
-        "pair-last-center-near-low": 6.320633242521486e-58,
-        "pair-last-community-near-high": 7.2995988876024e-58,
-        "pair-last-community-near-low": 3.657559854433971e-51,
-        "pair-last-raw-high": 8.93792849251177e-78,
-        "pair-last-raw-low": 0.9999999997629467,
-        "raw-high": 8.203188286672851e-81,
-        "raw-low": 1.831695837563381e-10,
-        "standard": 8.986874458299222e-91
-      },
-      "version": 1
-    },
-    "verdigris": {
-      "codename": "verdigris",
-      "confidence": 0.8067071916821121,
-      "fit_sum": 14.773577309990356,
-      "observations": 15,
-      "pairwise": [
-        {
-          "community": 0,
-          "loser": 11,
-          "weight": 0.3,
-          "winner": 1
-        },
-        {
-          "community": 0,
-          "loser": 2,
-          "weight": 0.3,
-          "winner": 4
-        },
-        {
-          "community": 0,
-          "loser": 3,
-          "weight": 0.3,
-          "winner": 4
-        },
-        {
-          "community": 0,
-          "loser": 10,
-          "weight": 0.3,
-          "winner": 4
-        },
-        {
-          "community": 0,
-          "loser": 4,
-          "weight": 0.3,
-          "winner": 6
-        },
-        {
-          "community": 0,
-          "loser": 1,
-          "weight": 0.3,
-          "winner": 7
-        },
-        {
-          "community": 0,
-          "loser": 5,
-          "weight": 0.3,
-          "winner": 11
-        },
-        {
-          "community": 0,
-          "loser": 8,
-          "weight": 0.3,
-          "winner": 11
-        },
-        {
-          "community": 0,
-          "loser": 10,
-          "weight": 0.3,
-          "winner": 11
-        },
-        {
-          "community": 0,
-          "loser": 2,
-          "weight": 0.3,
-          "winner": 12
-        },
-        {
-          "community": 0,
-          "loser": 5,
-          "weight": 0.3,
-          "winner": 12
-        },
-        {
-          "community": 0,
-          "loser": 8,
-          "weight": 0.3,
-          "winner": 12
+          "winner": 13
         },
         {
           "community": 0,
           "loser": 11,
           "weight": 1.2,
-          "winner": 12
-        },
-        {
-          "community": 0,
-          "loser": 8,
-          "weight": 0.3,
-          "winner": 13
-        },
-        {
-          "community": 0,
-          "loser": 11,
-          "weight": 0.3,
           "winner": 13
         },
         {
@@ -2936,9 +3670,1079 @@
         },
         {
           "community": 1,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 1
+        },
+        {
+          "community": 1,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 1,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 1,
+          "loser": 9,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 2,
+          "loser": 1,
+          "weight": 3.0,
+          "winner": 8
+        },
+        {
+          "community": 2,
+          "loser": 3,
+          "weight": 3.0,
+          "winner": 8
+        },
+        {
+          "community": 2,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 8
+        },
+        {
+          "community": 2,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 2,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 2,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 2,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 3,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 3,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 10
+        },
+        {
+          "community": 3,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 4,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 4,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 5,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 9
+        },
+        {
+          "community": 5,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 6,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 6
+        },
+        {
+          "community": 6,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 10
+        },
+        {
+          "community": 6,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 7,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 7,
+          "loser": 9,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 7,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 8,
+          "loser": 1,
+          "weight": 3.0,
+          "winner": 6
+        },
+        {
+          "community": 8,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 8,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 8,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 8,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 9,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 8
+        },
+        {
+          "community": 10,
+          "loser": 3,
+          "weight": 6.0,
+          "winner": 9
+        },
+        {
+          "community": 10,
+          "loser": 1,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 10,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 10,
+          "loser": 2,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 10,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 11,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 11,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 11,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 11,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 12,
+          "loser": 1,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 12,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 12,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 12,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 12,
+          "loser": 9,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 12,
+          "loser": 11,
+          "weight": 6.0,
+          "winner": 13
+        },
+        {
+          "community": 13,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 13,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 13,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 13
+        }
+      ],
+      "posterior": {
+        "center-far-high": 1.44850329439783e-34,
+        "center-far-low": 2.890859878521652e-41,
+        "center-match-high": 1.3878739415481533e-44,
+        "center-match-low": 1.2404718049118936e-121,
+        "center-near-high": 1.2946618869565645e-111,
+        "center-near-low": 5.783758361706311e-115,
+        "community-far-high": 5.940655019737069e-58,
+        "community-far-low": 1.185610092508301e-64,
+        "community-near-high": 1.0570687139811312e-74,
+        "community-near-low": 9.424635241706997e-85,
+        "pair-first-center-far-high": 1.77015930142677e-21,
+        "pair-first-center-far-low": 3.5328069483016556e-28,
+        "pair-first-center-match-high": 8.49836405109917e-25,
+        "pair-first-center-match-low": 6.7722586860709935e-112,
+        "pair-first-center-near-high": 1.5821557260258256e-98,
+        "pair-first-center-near-low": 7.068105195739538e-102,
+        "pair-first-community-far-high": 8.142651837884426e-35,
+        "pair-first-community-far-low": 1.625075040833538e-41,
+        "pair-first-raw-low": 5.008085503136732e-115,
+        "pair-last-center-far-high": 6.286208650691968e-45,
+        "pair-last-center-far-low": 1.2545741833370019e-51,
+        "pair-last-center-match-high": 3.0179481344808946e-48,
+        "pair-last-center-match-low": 2.4049717504397495e-135,
+        "pair-last-center-near-high": 5.61856834222126e-122,
+        "pair-last-center-near-low": 2.5100330794884194e-125,
+        "pair-last-community-near-high": 1.827206505198933e-98,
+        "pair-last-community-near-low": 1.629104579012404e-108,
+        "pair-last-raw-high": 1.4067591552582867e-24,
+        "pair-last-raw-low": 1.7784766821743546e-138,
+        "raw-high": 3.241532987600797e-14,
+        "raw-low": 9.173289372430332e-125,
+        "standard": 0.9999999999999676
+      },
+      "version": 1
+    },
+    "obsidian": {
+      "codename": "obsidian",
+      "confidence": 0.9999999994275287,
+      "fit_sum": 38.41256507130416,
+      "observations": 39,
+      "pairwise": [
+        {
+          "community": 0,
+          "loser": 2,
+          "weight": 0.3,
+          "winner": 1
+        },
+        {
+          "community": 0,
+          "loser": 3,
+          "weight": 0.6,
+          "winner": 1
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 1
+        },
+        {
+          "community": 0,
+          "loser": 6,
+          "weight": 0.3,
+          "winner": 1
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.8999999999999999,
+          "winner": 1
+        },
+        {
+          "community": 0,
+          "loser": 13,
+          "weight": 0.3,
+          "winner": 1
+        },
+        {
+          "community": 0,
+          "loser": 3,
+          "weight": 0.3,
+          "winner": 2
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 2
+        },
+        {
+          "community": 0,
+          "loser": 6,
+          "weight": 0.6,
+          "winner": 2
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.3,
+          "winner": 2
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.3,
+          "winner": 2
+        },
+        {
+          "community": 0,
+          "loser": 12,
+          "weight": 0.3,
+          "winner": 2
+        },
+        {
+          "community": 0,
+          "loser": 4,
+          "weight": 1.2,
+          "winner": 3
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 3
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.6,
+          "winner": 3
+        },
+        {
+          "community": 0,
+          "loser": 9,
+          "weight": 0.3,
+          "winner": 3
+        },
+        {
+          "community": 0,
+          "loser": 11,
+          "weight": 0.6,
+          "winner": 3
+        },
+        {
+          "community": 0,
+          "loser": 12,
+          "weight": 0.6,
+          "winner": 3
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 4
+        },
+        {
+          "community": 0,
+          "loser": 6,
+          "weight": 0.6,
+          "winner": 4
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.3,
+          "winner": 4
+        },
+        {
+          "community": 0,
+          "loser": 10,
+          "weight": 0.3,
+          "winner": 4
+        },
+        {
+          "community": 0,
+          "loser": 13,
+          "weight": 0.3,
+          "winner": 4
+        },
+        {
+          "community": 0,
+          "loser": 4,
+          "weight": 0.3,
+          "winner": 5
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.3,
+          "winner": 5
+        },
+        {
+          "community": 0,
+          "loser": 9,
+          "weight": 0.3,
+          "winner": 5
+        },
+        {
+          "community": 0,
+          "loser": 10,
+          "weight": 0.3,
+          "winner": 6
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.3,
+          "winner": 7
+        },
+        {
+          "community": 0,
+          "loser": 9,
+          "weight": 0.3,
+          "winner": 7
+        },
+        {
+          "community": 0,
+          "loser": 13,
+          "weight": 0.3,
+          "winner": 7
+        },
+        {
+          "community": 0,
+          "loser": 11,
+          "weight": 0.3,
+          "winner": 9
+        },
+        {
+          "community": 0,
+          "loser": 13,
+          "weight": 0.3,
+          "winner": 9
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.6,
+          "winner": 11
+        },
+        {
+          "community": 1,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 2
+        },
+        {
+          "community": 2,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 2,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 2,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 6
+        },
+        {
+          "community": 2,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 9
+        },
+        {
+          "community": 3,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 4
+        },
+        {
+          "community": 4,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 1
+        },
+        {
+          "community": 4,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 4,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 5
+        },
+        {
+          "community": 5,
+          "loser": 3,
+          "weight": 3.0,
+          "winner": 1
+        },
+        {
+          "community": 5,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 2
+        },
+        {
+          "community": 5,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 2
+        },
+        {
+          "community": 6,
+          "loser": 13,
+          "weight": 3.0,
+          "winner": 1
+        },
+        {
+          "community": 6,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 5
+        },
+        {
+          "community": 6,
+          "loser": 9,
+          "weight": 3.0,
+          "winner": 5
+        },
+        {
+          "community": 7,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 4
+        },
+        {
+          "community": 8,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 8,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 8,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 8,
+          "loser": 9,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 8,
+          "loser": 13,
+          "weight": 3.0,
+          "winner": 9
+        },
+        {
+          "community": 8,
+          "loser": 8,
+          "weight": 6.0,
+          "winner": 11
+        },
+        {
+          "community": 9,
+          "loser": 3,
+          "weight": 3.0,
+          "winner": 1
+        },
+        {
+          "community": 9,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 1
+        },
+        {
+          "community": 9,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 9,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 9,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 4
+        },
+        {
+          "community": 9,
+          "loser": 13,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 10,
+          "loser": 7,
+          "weight": 6.0,
+          "winner": 1
+        },
+        {
+          "community": 10,
+          "loser": 3,
+          "weight": 3.0,
+          "winner": 2
+        },
+        {
+          "community": 10,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 10,
+          "loser": 9,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 10,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 11,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 1
+        },
+        {
+          "community": 11,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 3
+        },
+        {
+          "community": 11,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 4
+        },
+        {
+          "community": 12,
+          "loser": 2,
+          "weight": 3.0,
+          "winner": 1
+        },
+        {
+          "community": 12,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 2
+        },
+        {
+          "community": 12,
+          "loser": 8,
+          "weight": 3.0,
+          "winner": 2
+        },
+        {
+          "community": 12,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 4
+        },
+        {
+          "community": 12,
+          "loser": 13,
+          "weight": 3.0,
+          "winner": 4
+        },
+        {
+          "community": 13,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 2
+        },
+        {
+          "community": 13,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 3
+        }
+      ],
+      "posterior": {
+        "center-far-high": 6.506464484016107e-51,
+        "center-far-low": 8.185070043517027e-31,
+        "center-match-high": 1.5690472904260187e-114,
+        "center-match-low": 8.796129263802229e-31,
+        "center-near-high": 7.315757077250476e-108,
+        "center-near-low": 1.8367251267504184e-94,
+        "community-far-high": 8.427953625604502e-41,
+        "community-far-low": 1.886550174078909e-37,
+        "community-near-high": 9.47624651371217e-98,
+        "community-near-low": 2.1212046606124172e-94,
+        "pair-first-center-far-high": 2.8236727857664974e-61,
+        "pair-first-center-far-low": 3.552153337384515e-41,
+        "pair-first-center-match-high": 3.041999337378778e-128,
+        "pair-first-center-match-low": 8.544902868505931e-38,
+        "pair-first-center-near-high": 7.106811616780224e-115,
+        "pair-first-center-near-low": 1.784266389628161e-101,
+        "pair-first-community-far-high": 1.6339742913412717e-54,
+        "pair-first-community-far-low": 1.6339742913412717e-54,
+        "pair-first-raw-low": 1.7793807421496597e-17,
+        "pair-last-center-far-high": 7.089233145079115e-48,
+        "pair-last-center-far-low": 8.918187441096459e-28,
+        "pair-last-center-match-high": 1.709583151465799e-111,
+        "pair-last-center-match-low": 4.80217789511277e-21,
+        "pair-last-center-near-high": 3.9939802916447273e-98,
+        "pair-last-center-near-low": 1.0027457008136629e-84,
+        "pair-last-community-near-high": 1.1580550747613832e-84,
+        "pair-last-community-near-low": 5.802586985792412e-78,
+        "pair-last-raw-high": 5.6478376259937685e-118,
+        "pair-last-raw-low": 0.9999999998168303,
+        "raw-high": 5.1835585278398646e-121,
+        "raw-low": 1.8316958376620802e-10,
+        "standard": 5.678766366074964e-131
+      },
+      "version": 1
+    },
+    "verdigris": {
+      "codename": "verdigris",
+      "confidence": 0.9999999999861026,
+      "fit_sum": 44.32347325245313,
+      "observations": 45,
+      "pairwise": [
+        {
+          "community": 0,
+          "loser": 11,
+          "weight": 0.3,
+          "winner": 1
+        },
+        {
+          "community": 0,
+          "loser": 2,
+          "weight": 0.3,
+          "winner": 4
+        },
+        {
+          "community": 0,
+          "loser": 3,
+          "weight": 0.3,
+          "winner": 4
+        },
+        {
+          "community": 0,
+          "loser": 10,
+          "weight": 0.3,
+          "winner": 4
+        },
+        {
+          "community": 0,
+          "loser": 1,
+          "weight": 0.3,
+          "winner": 5
+        },
+        {
+          "community": 0,
+          "loser": 4,
+          "weight": 0.6,
+          "winner": 6
+        },
+        {
+          "community": 0,
+          "loser": 12,
+          "weight": 0.3,
+          "winner": 6
+        },
+        {
+          "community": 0,
+          "loser": 1,
+          "weight": 0.3,
+          "winner": 7
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 7
+        },
+        {
+          "community": 0,
+          "loser": 6,
+          "weight": 0.3,
+          "winner": 7
+        },
+        {
+          "community": 0,
+          "loser": 4,
+          "weight": 0.3,
+          "winner": 8
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 8
+        },
+        {
+          "community": 0,
+          "loser": 6,
+          "weight": 0.3,
+          "winner": 8
+        },
+        {
+          "community": 0,
+          "loser": 10,
+          "weight": 0.3,
+          "winner": 8
+        },
+        {
+          "community": 0,
+          "loser": 11,
+          "weight": 0.6,
+          "winner": 8
+        },
+        {
+          "community": 0,
+          "loser": 1,
+          "weight": 0.3,
+          "winner": 10
+        },
+        {
+          "community": 0,
+          "loser": 4,
+          "weight": 0.3,
+          "winner": 10
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.6,
+          "winner": 10
+        },
+        {
+          "community": 0,
+          "loser": 9,
+          "weight": 0.3,
+          "winner": 10
+        },
+        {
+          "community": 0,
+          "loser": 12,
+          "weight": 0.6,
+          "winner": 10
+        },
+        {
+          "community": 0,
+          "loser": 3,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 9,
+          "weight": 0.3,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 10,
+          "weight": 0.6,
+          "winner": 11
+        },
+        {
+          "community": 0,
+          "loser": 2,
+          "weight": 0.3,
+          "winner": 12
+        },
+        {
+          "community": 0,
+          "loser": 3,
+          "weight": 0.3,
+          "winner": 12
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.3,
+          "winner": 12
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.6,
+          "winner": 12
+        },
+        {
+          "community": 0,
+          "loser": 11,
+          "weight": 1.5,
+          "winner": 12
+        },
+        {
+          "community": 0,
+          "loser": 5,
+          "weight": 0.6,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 6,
+          "weight": 0.3,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 7,
+          "weight": 0.3,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 8,
+          "weight": 0.3,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 9,
+          "weight": 0.3,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 10,
+          "weight": 0.3,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 11,
+          "weight": 1.2,
+          "winner": 13
+        },
+        {
+          "community": 0,
+          "loser": 12,
+          "weight": 0.8999999999999999,
+          "winner": 13
+        },
+        {
+          "community": 1,
           "loser": 11,
           "weight": 3.0,
           "winner": 1
+        },
+        {
+          "community": 1,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 11
         },
         {
           "community": 1,
@@ -2959,6 +4763,18 @@
           "winner": 6
         },
         {
+          "community": 3,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 8
+        },
+        {
+          "community": 3,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
           "community": 4,
           "loser": 2,
           "weight": 3.0,
@@ -2971,10 +4787,52 @@
           "winner": 4
         },
         {
+          "community": 4,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 4,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 4,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
           "community": 5,
           "loser": 1,
           "weight": 3.0,
           "winner": 7
+        },
+        {
+          "community": 5,
+          "loser": 1,
+          "weight": 3.0,
+          "winner": 10
+        },
+        {
+          "community": 5,
+          "loser": 9,
+          "weight": 3.0,
+          "winner": 10
+        },
+        {
+          "community": 5,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 6,
+          "loser": 12,
+          "weight": 3.0,
+          "winner": 6
         },
         {
           "community": 6,
@@ -2991,13 +4849,37 @@
         {
           "community": 6,
           "loser": 11,
-          "weight": 6.0,
+          "weight": 9.0,
           "winner": 12
+        },
+        {
+          "community": 6,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 6,
+          "loser": 9,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 7,
+          "loser": 3,
+          "weight": 3.0,
+          "winner": 11
+        },
+        {
+          "community": 7,
+          "loser": 9,
+          "weight": 3.0,
+          "winner": 11
         },
         {
           "community": 7,
           "loser": 11,
-          "weight": 3.0,
+          "weight": 6.0,
           "winner": 13
         },
         {
@@ -3013,8 +4895,74 @@
           "winner": 4
         },
         {
+          "community": 8,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 6
+        },
+        {
+          "community": 8,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 8
+        },
+        {
+          "community": 8,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 8
+        },
+        {
+          "community": 8,
+          "loser": 11,
+          "weight": 6.0,
+          "winner": 8
+        },
+        {
+          "community": 8,
+          "loser": 3,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 8,
+          "loser": 11,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 9,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 10
+        },
+        {
           "community": 9,
           "loser": 2,
+          "weight": 3.0,
+          "winner": 12
+        },
+        {
+          "community": 9,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 10,
+          "loser": 4,
+          "weight": 3.0,
+          "winner": 10
+        },
+        {
+          "community": 10,
+          "loser": 12,
+          "weight": 6.0,
+          "winner": 10
+        },
+        {
+          "community": 10,
+          "loser": 8,
           "weight": 3.0,
           "winner": 12
         },
@@ -3025,6 +4973,24 @@
           "winner": 12
         },
         {
+          "community": 11,
+          "loser": 6,
+          "weight": 3.0,
+          "winner": 7
+        },
+        {
+          "community": 11,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 8
+        },
+        {
+          "community": 11,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 10
+        },
+        {
           "community": 12,
           "loser": 8,
           "weight": 3.0,
@@ -3037,6 +5003,30 @@
           "winner": 12
         },
         {
+          "community": 12,
+          "loser": 5,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 12,
+          "loser": 7,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 12,
+          "loser": 10,
+          "weight": 3.0,
+          "winner": 13
+        },
+        {
+          "community": 13,
+          "loser": 1,
+          "weight": 3.0,
+          "winner": 5
+        },
+        {
           "community": 13,
           "loser": 8,
           "weight": 3.0,
@@ -3044,43 +5034,44 @@
         }
       ],
       "posterior": {
-        "center-far-high": 1.4703379149053047e-14,
-        "center-far-low": 6.56857152863176e-18,
-        "center-match-high": 7.917331049543799e-08,
-        "center-match-low": 1.1198770740610532e-44,
-        "center-near-high": 5.221479734997901e-38,
-        "center-near-low": 5.221479734997827e-38,
-        "community-far-high": 1.513968688710849e-24,
-        "community-far-low": 1.513968688710849e-24,
-        "community-near-high": 6.76348717059804e-28,
-        "community-near-low": 6.76348717059804e-28,
-        "pair-first-center-far-high": 1.602032610247785e-11,
-        "pair-first-center-far-low": 7.156902971036387e-15,
-        "pair-first-center-match-high": 0.1930986436275985,
-        "pair-first-center-match-low": 6.113881195937622e-35,
-        "pair-first-center-near-high": 6.380966447135683e-25,
-        "pair-first-center-near-low": 2.8506259754927913e-28,
-        "pair-first-community-far-high": 1.850162002913857e-11,
-        "pair-first-community-far-low": 1.850162002913857e-11,
-        "pair-first-raw-low": 4.5212153292740825e-38,
-        "pair-last-center-far-high": 6.380966447135683e-25,
-        "pair-last-center-far-low": 2.8506259754927913e-28,
-        "pair-last-center-match-high": 7.691204024770459e-15,
-        "pair-last-center-match-low": 2.435185808547129e-48,
-        "pair-last-center-near-high": 2.541567040459506e-38,
-        "pair-last-center-near-low": 1.1354168814415878e-41,
-        "pair-last-community-near-high": 1.311274912927794e-41,
-        "pair-last-community-near-low": 1.311274912927794e-41,
-        "pair-last-raw-high": 1.2731475860234234e-14,
-        "pair-last-raw-low": 1.8008199790584073e-51,
-        "raw-high": 1.3105790564144887e-07,
-        "raw-low": 8.281491301322137e-48,
-        "standard": 0.8069011460881196
+        "center-far-high": 2.5774388674639673e-51,
+        "center-far-low": 2.297998310077616e-61,
+        "center-match-high": 6.95412458928836e-38,
+        "center-match-low": 2.475679679242813e-128,
+        "center-near-high": 1.4520950050451907e-101,
+        "center-near-low": 2.8980280584256474e-108,
+        "community-far-high": 2.3661890596027854e-71,
+        "community-far-low": 4.72233721791176e-78,
+        "community-near-high": 4.722337217911626e-78,
+        "community-near-low": 2.109651766694079e-81,
+        "pair-first-center-far-high": 1.5782423143364108e-31,
+        "pair-first-center-far-low": 1.407132567534605e-41,
+        "pair-first-center-match-high": 9.531779775078399e-15,
+        "pair-first-center-match-low": 6.7722586860709935e-112,
+        "pair-first-center-near-high": 1.7745485907262921e-88,
+        "pair-first-center-near-low": 3.5415669009924317e-95,
+        "pair-first-community-far-high": 1.6250750408335612e-41,
+        "pair-first-community-far-low": 3.243254090827319e-48,
+        "pair-first-raw-low": 9.994919241962734e-122,
+        "pair-last-center-far-high": 1.1185558616224832e-61,
+        "pair-last-center-far-low": 9.97284363242763e-72,
+        "pair-last-center-match-high": 6.755507720366317e-45,
+        "pair-last-center-match-low": 4.7997380255976645e-142,
+        "pair-last-center-near-high": 1.2576850271090148e-118,
+        "pair-last-center-near-low": 2.5100330794887044e-125,
+        "pair-last-community-near-high": 1.629104579012404e-108,
+        "pair-last-community-near-low": 7.277843988369001e-112,
+        "pair-last-raw-high": 2.8075487411093048e-31,
+        "pair-last-raw-low": 7.083750956987689e-152,
+        "raw-high": 2.8900927279400443e-24,
+        "raw-low": 3.6537615602152637e-138,
+        "standard": 0.9999999999999905
       },
       "version": 1
     }
   },
   "source_hashes": [
+    "a4da5dde3a3430673357f73d56090c063dc01bf7d7b4d18e135e11432bbb2c03",
     "d4a9f9e68ffbd36213dbfd9b80208f77289cd0f8beb412dcd396e38223111048"
   ],
   "version": 1
