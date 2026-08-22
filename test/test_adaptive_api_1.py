@@ -2,7 +2,7 @@ import base64
 import json
 import unittest
 
-from app.phase1.adaptive_api_gateway_1.solution import solve
+from app.phase1.adaptive_api_gateway.solution import solve
 
 
 def encode_payload(adapt_input):

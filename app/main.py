@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from .phase1.adaptive_api_gateway_1.solution import solve
+from .phase2.adaptive.solution import solve
 from .phase1.kanchiong_delivery_driver.solution import solve_case
 from .phase1.showdown import decide_move
 from .phase1.toolbox.server import mcp
@@ -28,11 +28,7 @@ class SolveRequest(BaseModel):
 
 @app.post("/solve")
 def solve_endpoint(request: SolveRequest):
-    result = solve(request.payload)
-
-    return {
-        "adaptOutput": result
-    }
+    return solve(request.payload)
 
 
 @app.get("/health")
