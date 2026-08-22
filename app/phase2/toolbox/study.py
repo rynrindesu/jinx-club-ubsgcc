@@ -14,10 +14,8 @@ import httpx
 
 
 TOKEN_BUDGET = 900
-# The challenge permits 900 o200k_base tokens in total.  Three focused
-# evidence passages preserve answer coverage without exceeding that ceiling.
-MAX_PASSAGES = 3
-MAX_PASSAGE_TOKENS = 300
+MAX_PASSAGES = 2
+MAX_PASSAGE_TOKENS = 220
 MAX_WINDOW_SENTENCES = 3
 _STOP_WORDS = frozenset(
     {
