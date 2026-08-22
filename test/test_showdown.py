@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from phase01.showdown import decide_move, showdown_equity
+from app.phase1.showdown import decide_move, showdown_equity
 
 
 def sample_request():
