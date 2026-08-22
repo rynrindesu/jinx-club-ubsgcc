@@ -511,6 +511,7 @@ def _candidate_routes(
     # and the maximum affordable repeat count; historical inventory prevents
     # these routes from buying more shares than actually existed.
     repeated_routes: list[list[int]] = []
+    alternating_routes: list[list[int]] = []
     for _, _, route in pair_routes[:24]:
         base_cost = _route_cost(route)
         repetitions = min(25, energy // base_cost)
@@ -522,13 +523,37 @@ def _candidate_routes(
                 repeated.extend(route[1:])
             repeated_routes.append(_compact_route(repeated))
 
+        if (
+            len(route) == 4
+            and route[1] != PRESENT_YEAR
+            and route[2] != PRESENT_YEAR
+        ):
+            alternating = [PRESENT_YEAR, route[1]]
+            next_year = route[2]
+            for _ in range(25):
+                tentative = [*alternating, next_year, PRESENT_YEAR]
+                if _route_cost(tentative) > energy:
+                    break
+                alternating.append(next_year)
+                next_year = route[1] if next_year == route[2] else route[2]
+            if len(alternating) > 2:
+                alternating_routes.append(
+                    _compact_route([*alternating, PRESENT_YEAR])
+                )
+
     # Preserve route diversity before applying the global cap: broad two-trip
     # tours, reinvestment cycles, and isolated pair tours each catch different
     # capital constraints.
-    routes.extend(two_trip_routes[:24])
-    routes.extend(repeated_routes[:32])
-    routes.extend(route for _, _, route in pair_routes[:24])
-    routes.extend(two_trip_routes[24:])
+    for index in range(32):
+        if index < len(two_trip_routes):
+            routes.append(two_trip_routes[index])
+        if index < len(repeated_routes):
+            routes.append(repeated_routes[index])
+        if index < len(alternating_routes):
+            routes.append(alternating_routes[index])
+        if index < min(24, len(pair_routes)):
+            routes.append(pair_routes[index][2])
+    routes.extend(two_trip_routes[32:])
 
     max_routes = 45 if len(listings) > 250 else 90 if len(listings) > 80 else 140
     unique: list[list[int]] = []

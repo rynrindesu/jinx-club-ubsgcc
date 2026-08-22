@@ -152,5 +152,18 @@ class StonksTests(unittest.TestCase):
 
         self.assertEqual(_score_actions(case, solve_case(case)), 78)
 
+    def test_large_market_reinvests_across_repeated_round_trips(self):
+        case = {
+            "energy": 20,
+            "capital": 1,
+            "timeline": {"2037": {}, "2036": {}},
+        }
+        for index in range(70):
+            stock = f"S{index}"
+            case["timeline"]["2037"][stock] = {"price": 2, "qty": 0}
+            case["timeline"]["2036"][stock] = {"price": 1, "qty": 1}
+
+        self.assertEqual(_score_actions(case, solve_case(case)), 71)
+
 if __name__ == "__main__":
     unittest.main()
