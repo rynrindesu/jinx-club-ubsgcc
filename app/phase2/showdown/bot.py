@@ -90,17 +90,19 @@ def _pre_reveal_move(
     if estimate.confidence == "unknown":
         if to_call == 0:
             return _fallback(payload, "check")
-        if risk.delta <= -10:
-            return _fallback(payload, "fold")
         if is_button and not actions and "call" in _legal_actions(payload):
             return {"action": "call"}
-        if to_call <= big_blind and to_call < stack:
+        if (
+            _cheap_calibration_allowed(payload, to_call, big_blind)
+            and to_call < stack
+            and not risk.protect
+        ):
             return _fallback(payload, "call")
         return _fallback(payload, "fold")
 
     # A partially identified rule must never recreate the calibration
-    # attempt's 23-29 chip losses.  Information has value, but only at a
-    # literal small-blind/big-blind price; large bets wait for a trusted rule.
+    # attempt's 23-29 chip losses. Information has value up to a tightly capped
+    # blind-plus-small-blind continuation; large bets wait for a trusted rule.
     if (
         estimate.confidence == "partial"
         and to_call > 0
@@ -114,7 +116,11 @@ def _pre_reveal_move(
     ):
         return _fallback(payload, "fold")
 
-    margin = 0.08 if estimate.confidence == "partial" else 0.045
+    decision_consensus = _decision_consensus(estimate)
+    if estimate.confidence == "partial":
+        margin = 0.055 if decision_consensus else 0.08
+    else:
+        margin = 0.045
     if profile.passive:
         margin += 0.025
     if profile.aggressive:
@@ -124,11 +130,12 @@ def _pre_reveal_move(
     if risk.desperate:
         margin -= 0.035
 
-    conservative = (
-        estimate.lower
-        if estimate.confidence == "partial"
-        else estimate.mean - 0.20 * estimate.disagreement
-    )
+    if estimate.confidence == "partial" and decision_consensus:
+        conservative = estimate.mean - 0.15 * estimate.disagreement
+    elif estimate.confidence == "partial":
+        conservative = estimate.lower
+    else:
+        conservative = estimate.mean - 0.20 * estimate.disagreement
 
     if is_button and not actions:
         open_threshold = 0.50
@@ -184,6 +191,11 @@ def _pre_reveal_move(
                 payload,
                 "raise",
                 0.45,
+                hand_exposure_cap=(
+                    _calibration_exposure_cap(payload, big_blind)
+                    if estimate.confidence == "partial"
+                    else None
+                ),
                 allow_all_in=(
                     risk.desperate
                     and estimate.confidence == "learned"
@@ -198,7 +210,6 @@ def _pre_reveal_move(
     if (
         estimate.confidence == "partial"
         and not risk.protect
-        and risk.delta > -10
         and to_call <= big_blind
         and estimate.mean >= pot_odds
         and to_call < stack
@@ -221,13 +232,14 @@ def _post_reveal_move(
     if estimate.confidence == "unknown":
         if to_call == 0:
             return _fallback(payload, "check")
-        if risk.delta <= -10:
-            return _fallback(payload, "fold")
         # Calling normally closes heads-up action and exposes both numbers.
-        # Cap the calibration cost tightly; an unknown pair is still unknown.
-        pot_before_bet = max(1, pot - to_call)
-        cheap = to_call <= big_blind or to_call / pot_before_bet <= 0.20
-        if cheap and to_call < stack and not risk.protect:
+        # A three-chip continuation is still cheap enough to prevent an
+        # opponent from auto-profiting every time we limp or check.
+        if (
+            _cheap_calibration_allowed(payload, to_call, big_blind)
+            and to_call < stack
+            and not risk.protect
+        ):
             return _fallback(payload, "call")
         return _fallback(payload, "fold")
 
@@ -244,11 +256,13 @@ def _post_reveal_move(
     ):
         return _fallback(payload, "fold")
 
-    conservative = (
-        estimate.lower
-        if estimate.confidence == "partial"
-        else estimate.mean - 0.15 * estimate.disagreement
-    )
+    decision_consensus = _decision_consensus(estimate)
+    if estimate.confidence == "partial" and decision_consensus:
+        conservative = estimate.mean - 0.10 * estimate.disagreement
+    elif estimate.confidence == "partial":
+        conservative = estimate.lower
+    else:
+        conservative = estimate.mean - 0.15 * estimate.disagreement
     adjustment = 0.0
     if profile.aggressive:
         adjustment -= 0.035
@@ -307,7 +321,6 @@ def _post_reveal_move(
         if (
             estimate.confidence == "partial"
             and not risk.protect
-            and risk.delta > -10
             and to_call <= big_blind
             and estimate.mean >= pot_odds + 0.02
             and to_call < stack
@@ -324,7 +337,7 @@ def _post_reveal_move(
         value_threshold += 0.025
     if conservative >= value_threshold:
         fraction = 0.65 if profile.calling_station else 0.50
-        if estimate.confidence == "partial":
+        if estimate.confidence == "partial" and not decision_consensus:
             fraction = 1 / 3
         if (
             risk.desperate
@@ -336,6 +349,11 @@ def _post_reveal_move(
             payload,
             wager_action,
             fraction,
+            hand_exposure_cap=(
+                _calibration_exposure_cap(payload, big_blind)
+                if estimate.confidence == "partial"
+                else None
+            ),
             allow_all_in=(
                 risk.desperate
                 and estimate.confidence == "learned"
@@ -408,11 +426,9 @@ def _partial_exposure_allowed(
 ) -> bool:
     """Permit only cheap calibration calls before a rule is trusted."""
 
-    starting_stack = max(1, _integer(payload.get("starting_stack"), 200))
-    exposure_cap = max(2 * big_blind, round(0.04 * starting_stack))
-    if _current_hand_commitment(payload) + to_call > exposure_cap:
+    if not _within_calibration_cap(payload, to_call, big_blind):
         return False
-    if to_call <= big_blind:
+    if _cheap_calibration_allowed(payload, to_call, big_blind):
         return True
     pot_before_wager = max(1, pot - to_call)
     if to_call <= 2 * big_blind and to_call / pot_before_wager <= 0.20:
@@ -421,6 +437,45 @@ def _partial_exposure_allowed(
         to_call <= 4 * big_blind
         and estimate.lower >= 0.90
         and estimate.coverage >= 0.95
+    )
+
+
+def _cheap_calibration_allowed(
+    payload: Mapping[str, Any], to_call: int, big_blind: int
+) -> bool:
+    """Allow a blind-plus-small-blind call within the eight-chip hand cap."""
+
+    small_blind = max(1, _integer(payload.get("small_blind"), 1))
+    return (
+        to_call <= big_blind + small_blind
+        and _within_calibration_cap(payload, to_call, big_blind)
+    )
+
+
+def _within_calibration_cap(
+    payload: Mapping[str, Any], to_call: int, big_blind: int
+) -> bool:
+    exposure_cap = _calibration_exposure_cap(payload, big_blind)
+    return _current_hand_commitment(payload) + to_call <= exposure_cap
+
+
+def _calibration_exposure_cap(
+    payload: Mapping[str, Any], big_blind: int
+) -> int:
+    starting_stack = max(1, _integer(payload.get("starting_stack"), 200))
+    return max(2 * big_blind, round(0.04 * starting_stack))
+
+
+def _decision_consensus(estimate: EquityEstimate) -> bool:
+    """Trust a partial model only when live candidates agree on this hand."""
+
+    return (
+        estimate.confidence == "learned"
+        or (
+            estimate.confidence == "partial"
+            and estimate.candidate_count > 0
+            and estimate.disagreement <= 0.10
+        )
     )
 
 
@@ -502,6 +557,7 @@ def _pot_wager(
     action: str,
     fraction: float,
     *,
+    hand_exposure_cap: int | None = None,
     allow_all_in: bool = False,
     fallback: str,
 ) -> Action:
@@ -518,6 +574,11 @@ def _pot_wager(
     desired = contribution + to_call + max(1, round(pot * fraction))
     if not allow_all_in:
         maximum = _non_all_in_maximum(payload, maximum)
+    if hand_exposure_cap is not None:
+        remaining_exposure = max(
+            0, hand_exposure_cap - _current_hand_commitment(payload)
+        )
+        maximum = min(maximum, contribution + remaining_exposure)
     if maximum < minimum:
         return _fallback(payload, fallback)
     return {"action": action, "amount": max(minimum, min(maximum, desired))}
