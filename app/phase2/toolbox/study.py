@@ -280,12 +280,19 @@ def _span_candidates(
                     query_phrases,
                     answer_signals,
                 )
+                answer_sentences = _answer_sentences(
+                    heading,
+                    sentences[start:end],
+                    query_terms,
+                    query_phrases,
+                    answer_signals,
+                )
                 candidates.append(
                     _SpanCandidate(
                         score=score,
                         matched_terms=frozenset(matched_terms),
                         source=(document.url, heading, start, end),
-                        passage=f"{heading}\n{evidence}",
+                        passage=f"{heading}\n{' '.join(answer_sentences)}",
                     )
                 )
     return candidates
@@ -365,7 +372,51 @@ def _answer_signals(question: str) -> set[str]:
         signals.add("date")
     if "how many" in lowered or "how much" in lowered or "number of" in lowered:
         signals.add("number")
+    if "why" in lowered or any(
+        phrase in lowered for phrase in ("what caused", "reason for", "due to")
+    ):
+        signals.add("cause")
     return signals
+
+
+def _answer_sentences(
+    heading: str,
+    sentences: list[str],
+    query_terms: set[str],
+    query_phrases: set[str],
+    answer_signals: set[str],
+) -> list[str]:
+    """Keep only sentences that directly carry the requested answer type."""
+
+    scored = [
+        (
+            _span_score(heading, sentence, query_terms, query_phrases, answer_signals),
+            sentence,
+        )
+        for sentence in sentences
+    ]
+    intent_sentences = [
+        sentence
+        for (_, sentence) in scored
+        if _matches_answer_signal(sentence, answer_signals)
+    ]
+    if intent_sentences:
+        return intent_sentences
+
+    # For questions without a date/number/cause cue, retain only the sentence
+    # with the strongest direct evidence instead of emitting all span context.
+    return [max(scored, key=lambda item: item[0][0])[1]]
+
+
+def _matches_answer_signal(sentence: str, answer_signals: set[str]) -> bool:
+    if "date" in answer_signals and _DATE_PATTERN.search(sentence):
+        return True
+    if "number" in answer_signals and re.search(r"\b\d+(?:\.\d+)?\b", sentence):
+        return True
+    if "cause" in answer_signals:
+        sentence_terms = {_normalise_term(term) for term in _tokens(sentence)}
+        return bool(sentence_terms & _synonyms_for("cause"))
+    return False
 
 
 def _span_score(
