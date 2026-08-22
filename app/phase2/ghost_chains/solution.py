@@ -12,7 +12,7 @@ from app.phase1.ghost_chains.solution import (
     GhostChainsEngine as StructuralGhostChainsEngine,
 )
 
-from .identity import IdentityScorer
+from .identity import IdentityConfig, IdentityEvent, IdentityScorer
 from .models import Transaction
 from .scoring import DiscountedWalkScorer, ScoreConfig
 
@@ -28,8 +28,13 @@ class GhostChainsEngine(StructuralGhostChainsEngine):
         window: timedelta = timedelta(hours=24),
         ledger_path: str | PathLike[str] | None = None,
     ):
-        self.identity_scorer = identity_scorer or IdentityScorer()
         super().__init__(scorer=scorer, window=window, ledger_path=ledger_path)
+        self.identity_scorer = identity_scorer or IdentityScorer(
+            IdentityConfig(
+                max_path_length=self.scorer.config.max_walk_length,
+                max_route_states=self.scorer.config.max_route_signatures,
+            )
+        )
 
     def _process_unique(self, transaction: Transaction) -> float:
         if self._watermark is None or transaction.created_at > self._watermark:
@@ -44,10 +49,11 @@ class GhostChainsEngine(StructuralGhostChainsEngine):
         structural = self._score_structural(transaction)
 
         identity = self.identity_scorer.score(
-            transaction,
-            (entry.transaction for entry in self._active.values()),
-            self._forward,
-            self._reverse,
+            IdentityEvent(transaction, self._next_sequence + 1),
+            (
+                IdentityEvent(entry.transaction, entry.sequence)
+                for entry in self._active.values()
+            ),
             structural,
         )
         raw = structural.raw + identity.raw

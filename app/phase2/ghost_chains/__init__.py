@@ -3,6 +3,7 @@
 from .identity import (
     IdentityConfig,
     IdentityDimensionScore,
+    IdentityEvent,
     IdentityScore,
     IdentityScorer,
 )
@@ -11,7 +12,7 @@ from .models import (
     TransactionConflictError,
     TransactionValidationError,
 )
-from .scoring import DiscountedWalkScorer, ScoreConfig, StructuralScore
+from .scoring import DiscountedWalkScorer, ScoreConfig, StructuralScore, TemporalEdge
 from .solution import (
     EngineSnapshot,
     GhostChainsEngine,
@@ -27,10 +28,12 @@ __all__ = [
     "GhostChainsEngine",
     "IdentityConfig",
     "IdentityDimensionScore",
+    "IdentityEvent",
     "IdentityScore",
     "IdentityScorer",
     "ScoreConfig",
     "StructuralScore",
+    "TemporalEdge",
     "Transaction",
     "TransactionConflictError",
     "TransactionValidationError",

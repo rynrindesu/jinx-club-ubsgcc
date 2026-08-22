@@ -1,22 +1,24 @@
-"""Identity evidence for the cumulative Ghost Chains Phase 2 model."""
+"""Time-respecting identity evidence for Ghost Chains Phase 2."""
 
 from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 import json
 import math
 from typing import Iterable
 
 from .models import PresentValue, Transaction
-from .scoring import Adjacency, StructuralScore
+from .scoring import StructuralScore
 
 
 @dataclass(frozen=True)
 class IdentityConfig:
     """Deterministic parameters for two independent identity dimensions."""
 
-    max_path_length: int = 7
+    max_path_length: int = 8
+    max_route_states: int = 250_000
     path_discount: float = 0.65
     structural_scale: float = 2.0
     alignment_weight: float = 1.35
@@ -30,6 +32,8 @@ class IdentityConfig:
     def __post_init__(self) -> None:
         if self.max_path_length < 1:
             raise ValueError("max_path_length must be positive")
+        if self.max_route_states < 1:
+            raise ValueError("max_route_states must be positive")
         if not 0 < self.path_discount < 1:
             raise ValueError("path_discount must be between zero and one")
         for name in (
@@ -44,6 +48,18 @@ class IdentityConfig:
         ):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
+
+
+@dataclass(frozen=True)
+class IdentityEvent:
+    """One active identity-bearing event with its arrival tie-breaker."""
+
+    transaction: Transaction
+    sequence: int
+
+    @property
+    def key(self) -> tuple[datetime, int]:
+        return self.transaction.created_at, self.sequence
 
 
 @dataclass(frozen=True)
@@ -71,11 +87,12 @@ class IdentityScore:
 
 
 class IdentityScorer:
-    """Score identity agreement, trail changes, and cross-component reuse.
+    """Score causal identity paths and cross-component reuse.
 
-    The scorer only reads transactions that are currently active in the
-    structural engine.  Consequently expiry, reset, retries, and out-of-order
-    event handling remain governed by the same single 24-hour state model.
+    Path evidence follows the same strict ``(createdAt, arrival sequence)``
+    ordering and simple-route rules as Phase 1 structural scoring. An
+    out-of-order candidate can therefore connect to a later active event, but
+    an event that is later in event time cannot masquerade as an earlier leg.
     """
 
     def __init__(self, config: IdentityConfig | None = None):
@@ -83,45 +100,37 @@ class IdentityScorer:
 
     def score(
         self,
-        transaction: Transaction,
-        active_transactions: Iterable[Transaction],
-        forward: Adjacency,
-        reverse: Adjacency,
+        candidate: IdentityEvent,
+        active_events: Iterable[IdentityEvent],
         structural: StructuralScore,
     ) -> IdentityScore:
         """Return identity evidence visible immediately before activation."""
 
-        active = tuple(active_transactions)
+        active = tuple(active_events)
         if not active:
             return IdentityScore.zero()
 
-        transactions_by_pair: defaultdict[
-            tuple[str, str], list[Transaction]
-        ] = defaultdict(list)
-        for historical in active:
-            transactions_by_pair[(historical.sender, historical.recipient)].append(
-                historical
-            )
-
+        upstream, downstream = self._causal_context(candidate, active)
+        neighbors = self._component_neighbors(active)
         structural_activation = self._structural_activation(structural.raw)
         dimensions = (
             self._score_dimension(
                 "ip",
-                transaction,
+                candidate,
                 active,
-                transactions_by_pair,
-                forward,
-                reverse,
+                upstream,
+                downstream,
+                neighbors,
                 structural_activation,
                 self.config.ip_reliability,
             ),
             self._score_dimension(
                 "device",
-                transaction,
+                candidate,
                 active,
-                transactions_by_pair,
-                forward,
-                reverse,
+                upstream,
+                downstream,
+                neighbors,
                 structural_activation,
                 self.config.device_reliability,
             ),
@@ -135,58 +144,63 @@ class IdentityScorer:
     def _score_dimension(
         self,
         dimension: str,
-        transaction: Transaction,
-        active: tuple[Transaction, ...],
-        transactions_by_pair: dict[tuple[str, str], list[Transaction]],
-        forward: Adjacency,
-        reverse: Adjacency,
+        candidate: IdentityEvent,
+        active: tuple[IdentityEvent, ...],
+        upstream: tuple[tuple[IdentityEvent, int], ...],
+        downstream: tuple[tuple[IdentityEvent, int], ...],
+        neighbors: dict[str, set[str]],
         structural_activation: float,
         reliability: float,
     ) -> IdentityDimensionScore:
+        transaction = candidate.transaction
         current_key = _identity_key(getattr(transaction, dimension))
-        upstream = self._upstream_weights(
-            dimension,
-            transaction.sender,
-            transactions_by_pair,
-            reverse,
-        )
-        path_mass = math.fsum(upstream.values())
-        path_strength = 1.0 - math.exp(-path_mass)
+        upstream_weights = self._context_weights(dimension, upstream)
+        downstream_weights = self._context_weights(dimension, downstream)
+        context_weights = dict(upstream_weights)
+        for key, weight in downstream_weights.items():
+            context_weights[key] = context_weights.get(key, 0.0) + weight
+
+        context_mass = math.fsum(context_weights.values())
+        context_strength = 1.0 - math.exp(-context_mass)
+        upstream_mass = math.fsum(upstream_weights.values())
+        upstream_strength = 1.0 - math.exp(-upstream_mass)
 
         alignment = 0.0
         divergence = 0.0
         dropout = 0.0
         disconnected_reuse = 0.0
 
-        if path_mass > 0:
-            concentration = max(upstream.values()) / path_mass
+        if current_key is None and upstream_mass > 0:
+            # Only an earlier causal leg can establish a trail that the
+            # candidate subsequently drops. A field first appearing on a
+            # downstream leg is not retroactively treated as a dropout.
+            concentration = max(upstream_weights.values()) / upstream_mass
+            dropout = (
+                self.config.dropout_weight
+                * upstream_strength
+                * (0.5 + 0.5 * concentration)
+                * (0.6 + 0.4 * structural_activation)
+            )
+        elif current_key is not None and context_mass > 0:
+            matching_mass = context_weights.get(current_key, 0.0)
+            mismatching_mass = max(0.0, context_mass - matching_mass)
+            match_ratio = matching_mass / context_mass
+            mismatch_ratio = mismatching_mass / context_mass
             structural_context = 0.35 + 0.65 * structural_activation
-            if current_key is None:
-                dropout = (
-                    self.config.dropout_weight
-                    * path_strength
-                    * (0.5 + 0.5 * concentration)
-                    * (0.6 + 0.4 * structural_activation)
+            if matching_mass > 0:
+                alignment = (
+                    self.config.alignment_weight
+                    * context_strength
+                    * match_ratio**2
+                    * (0.25 + 0.75 * structural_activation)
                 )
-            else:
-                matching_mass = upstream.get(current_key, 0.0)
-                mismatching_mass = max(0.0, path_mass - matching_mass)
-                match_ratio = matching_mass / path_mass
-                mismatch_ratio = mismatching_mass / path_mass
-                if matching_mass > 0:
-                    alignment = (
-                        self.config.alignment_weight
-                        * path_strength
-                        * match_ratio**2
-                        * (0.25 + 0.75 * structural_activation)
-                    )
-                if mismatching_mass > 0:
-                    divergence = (
-                        self.config.divergence_weight
-                        * path_strength
-                        * mismatch_ratio
-                        * structural_context
-                    )
+            if mismatching_mass > 0:
+                divergence = (
+                    self.config.divergence_weight
+                    * context_strength
+                    * mismatch_ratio
+                    * structural_context
+                )
 
         if current_key is not None:
             foreign_components = self._foreign_component_count(
@@ -194,8 +208,7 @@ class IdentityScorer:
                 current_key,
                 transaction,
                 active,
-                forward,
-                reverse,
+                neighbors,
             )
             bounded_components = (
                 self.config.disconnected_capacity
@@ -223,89 +236,193 @@ class IdentityScorer:
             disconnected_reuse=disconnected_reuse,
         )
 
-    def _upstream_weights(
+    def _causal_context(
+        self,
+        candidate: IdentityEvent,
+        active: tuple[IdentityEvent, ...],
+    ) -> tuple[
+        tuple[tuple[IdentityEvent, int], ...],
+        tuple[tuple[IdentityEvent, int], ...],
+    ]:
+        """Find active events on valid causal routes containing the candidate."""
+
+        incoming: defaultdict[str, list[IdentityEvent]] = defaultdict(list)
+        outgoing: defaultdict[str, list[IdentityEvent]] = defaultdict(list)
+        for event in active:
+            transaction = event.transaction
+            if transaction.sender == transaction.recipient:
+                continue
+            incoming[transaction.recipient].append(event)
+            outgoing[transaction.sender].append(event)
+        for events in (*incoming.values(), *outgoing.values()):
+            events.sort(key=self._event_sort_key)
+
+        upstream = self._walk_upstream(candidate, incoming)
+        downstream = self._walk_downstream(candidate, outgoing)
+        return upstream, downstream
+
+    def _walk_upstream(
+        self,
+        candidate: IdentityEvent,
+        incoming: dict[str, list[IdentityEvent]],
+    ) -> tuple[tuple[IdentityEvent, int], ...]:
+        transaction = candidate.transaction
+        found: dict[int, tuple[IdentityEvent, int]] = {}
+        stack = [
+            (
+                transaction.sender,
+                candidate.key,
+                (transaction.sender, transaction.recipient),
+                0,
+            )
+        ]
+        explored_states = 0
+
+        while stack and explored_states < self.config.max_route_states:
+            explored_states += 1
+            node, boundary, route, distance = stack.pop()
+            if route[0] == route[-1] or distance >= self.config.max_path_length - 1:
+                continue
+            for event in reversed(incoming.get(node, ())):
+                if event.key >= boundary:
+                    continue
+                predecessor = event.transaction.sender
+                if predecessor in route and predecessor != route[-1]:
+                    continue
+                next_distance = distance + 1
+                previous = found.get(event.sequence)
+                if previous is None or next_distance < previous[1]:
+                    found[event.sequence] = (event, next_distance)
+                stack.append(
+                    (
+                        predecessor,
+                        event.key,
+                        (predecessor, *route),
+                        next_distance,
+                    )
+                )
+
+        return tuple(sorted(found.values(), key=self._context_sort_key))
+
+    def _walk_downstream(
+        self,
+        candidate: IdentityEvent,
+        outgoing: dict[str, list[IdentityEvent]],
+    ) -> tuple[tuple[IdentityEvent, int], ...]:
+        transaction = candidate.transaction
+        found: dict[int, tuple[IdentityEvent, int]] = {}
+        stack = [
+            (
+                transaction.recipient,
+                candidate.key,
+                (transaction.sender, transaction.recipient),
+                0,
+            )
+        ]
+        explored_states = 0
+
+        while stack and explored_states < self.config.max_route_states:
+            explored_states += 1
+            node, boundary, route, distance = stack.pop()
+            if route[0] == route[-1] or distance >= self.config.max_path_length - 1:
+                continue
+            for event in outgoing.get(node, ()):
+                if event.key <= boundary:
+                    continue
+                recipient = event.transaction.recipient
+                if recipient in route and recipient != route[0]:
+                    continue
+                next_distance = distance + 1
+                previous = found.get(event.sequence)
+                if previous is None or next_distance < previous[1]:
+                    found[event.sequence] = (event, next_distance)
+                stack.append(
+                    (
+                        recipient,
+                        event.key,
+                        (*route, recipient),
+                        next_distance,
+                    )
+                )
+
+        return tuple(sorted(found.values(), key=self._context_sort_key))
+
+    def _context_weights(
         self,
         dimension: str,
-        sender: str,
-        transactions_by_pair: dict[tuple[str, str], list[Transaction]],
-        reverse: Adjacency,
+        context: tuple[tuple[IdentityEvent, int], ...],
     ) -> dict[str, float]:
-        """Aggregate identity values on directed paths ending at the sender."""
+        """Average parallel-event evidence, then discount it by path distance."""
+
+        groups: defaultdict[
+            tuple[str, str, int], list[IdentityEvent]
+        ] = defaultdict(list)
+        for event, distance in context:
+            transaction = event.transaction
+            groups[(transaction.sender, transaction.recipient, distance)].append(
+                event
+            )
 
         weights: defaultdict[str, float] = defaultdict(float)
-        visited = {sender}
-        frontier = {sender}
-        discount = 1.0
-
-        for _ in range(self.config.max_path_length):
-            next_frontier: set[str] = set()
-            for recipient in sorted(frontier):
-                for predecessor in sorted(reverse.get(recipient, ())):
-                    pair_transactions = transactions_by_pair.get(
-                        (predecessor, recipient), ()
-                    )
-                    # Parallel payments share one structural edge.  Averaging
-                    # their evidence prevents payment frequency alone from
-                    # manufacturing an identity anomaly.
-                    pair_weight = discount / max(1, len(pair_transactions))
-                    for historical in pair_transactions:
-                        key = _identity_key(getattr(historical, dimension))
-                        if key is not None:
-                            weights[key] += pair_weight
-                    if predecessor not in visited:
-                        next_frontier.add(predecessor)
-            if not next_frontier:
-                break
-            visited.update(next_frontier)
-            frontier = next_frontier
-            discount *= self.config.path_discount
-
+        for (_, _, distance), events in sorted(groups.items()):
+            group_weight = (
+                self.config.path_discount ** (distance - 1)
+            ) / len(events)
+            for event in events:
+                key = _identity_key(getattr(event.transaction, dimension))
+                if key is not None:
+                    weights[key] += group_weight
         return dict(weights)
+
+    @staticmethod
+    def _component_neighbors(
+        active: tuple[IdentityEvent, ...],
+    ) -> dict[str, set[str]]:
+        neighbors: defaultdict[str, set[str]] = defaultdict(set)
+        for event in active:
+            transaction = event.transaction
+            if transaction.sender == transaction.recipient:
+                continue
+            neighbors[transaction.sender].add(transaction.recipient)
+            neighbors[transaction.recipient].add(transaction.sender)
+        return dict(neighbors)
 
     def _foreign_component_count(
         self,
         dimension: str,
         current_key: str,
         transaction: Transaction,
-        active: tuple[Transaction, ...],
-        forward: Adjacency,
-        reverse: Adjacency,
+        active: tuple[IdentityEvent, ...],
+        neighbors: dict[str, set[str]],
     ) -> int:
         """Count weak components reusing the identity away from this edge."""
 
         local_nodes = self._weak_component(
-            transaction.sender, forward, reverse
-        ) | self._weak_component(transaction.recipient, forward, reverse)
+            transaction.sender, neighbors
+        ) | self._weak_component(transaction.recipient, neighbors)
         foreign_components: set[frozenset[str]] = set()
 
-        for historical in active:
+        for event in active:
+            historical = event.transaction
             if _identity_key(getattr(historical, dimension)) != current_key:
                 continue
             if historical.sender in local_nodes or historical.recipient in local_nodes:
                 continue
-            component = self._weak_component(historical.sender, forward, reverse)
-            component.update(
-                self._weak_component(historical.recipient, forward, reverse)
-            )
+            component = self._weak_component(historical.sender, neighbors)
+            component.update(self._weak_component(historical.recipient, neighbors))
             foreign_components.add(frozenset(component))
 
         return len(foreign_components)
 
     @staticmethod
-    def _weak_component(
-        start: str,
-        forward: Adjacency,
-        reverse: Adjacency,
-    ) -> set[str]:
+    def _weak_component(start: str, neighbors: dict[str, set[str]]) -> set[str]:
         visited = {start}
         frontier = {start}
         while frontier:
             next_frontier = {
                 neighbor
                 for node in frontier
-                for neighbor in (
-                    set(forward.get(node, ())) | set(reverse.get(node, ()))
-                )
+                for neighbor in neighbors.get(node, ())
                 if neighbor not in visited
             }
             visited.update(next_frontier)
@@ -316,6 +433,24 @@ class IdentityScorer:
         if not math.isfinite(raw):
             return 1.0
         return math.tanh(max(0.0, raw) / self.config.structural_scale)
+
+    @staticmethod
+    def _event_sort_key(event: IdentityEvent) -> tuple[datetime, int, str, str]:
+        transaction = event.transaction
+        return (
+            transaction.created_at,
+            event.sequence,
+            transaction.sender,
+            transaction.recipient,
+        )
+
+    @classmethod
+    def _context_sort_key(
+        cls,
+        item: tuple[IdentityEvent, int],
+    ) -> tuple[int, datetime, int, str, str]:
+        event, distance = item
+        return distance, *cls._event_sort_key(event)
 
 
 def _identity_key(value: PresentValue) -> str | None:
@@ -340,6 +475,7 @@ def _identity_key(value: PresentValue) -> str | None:
 __all__ = [
     "IdentityConfig",
     "IdentityDimensionScore",
+    "IdentityEvent",
     "IdentityScore",
     "IdentityScorer",
 ]

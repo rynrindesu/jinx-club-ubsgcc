@@ -168,6 +168,157 @@ class IdentityPathTests(unittest.TestCase):
 
         self.assertGreater(two_dimensions, one_dimension)
 
+    def test_reversed_event_time_cannot_manufacture_identity_alignment(self):
+        engine = GhostChainsEngine()
+        engine.score_transaction(
+            transaction(
+                "later-first",
+                "A",
+                "B",
+                when=BASE_TIME + timedelta(minutes=2),
+                deviceId="device-a",
+            )
+        )
+
+        reversed_score = engine.score_transaction(
+            transaction(
+                "earlier-second",
+                "B",
+                "C",
+                when=BASE_TIME + timedelta(minutes=1),
+                deviceId="device-a",
+            )
+        )
+
+        self.assertEqual(reversed_score, 0.0)
+
+    def test_late_arriving_bridge_can_align_with_a_later_active_event(self):
+        plain = Phase1Engine()
+        plain.score_transaction(
+            transaction(
+                "plain-later",
+                "B",
+                "C",
+                when=BASE_TIME + timedelta(minutes=2),
+            )
+        )
+        structural_score = plain.score_transaction(
+            transaction(
+                "plain-bridge",
+                "A",
+                "B",
+                when=BASE_TIME + timedelta(minutes=1),
+            )
+        )
+
+        enriched = GhostChainsEngine()
+        enriched.score_transaction(
+            transaction(
+                "rich-later",
+                "B",
+                "C",
+                when=BASE_TIME + timedelta(minutes=2),
+                deviceId="device-a",
+            )
+        )
+        identity_score = enriched.score_transaction(
+            transaction(
+                "rich-bridge",
+                "A",
+                "B",
+                when=BASE_TIME + timedelta(minutes=1),
+                deviceId="device-a",
+            )
+        )
+
+        self.assertGreater(identity_score, structural_score)
+
+    def test_downstream_only_identity_does_not_create_a_dropout(self):
+        phase_one = Phase1Engine()
+        phase_one.score_transaction(
+            transaction(
+                "plain-downstream",
+                "B",
+                "C",
+                when=BASE_TIME + timedelta(minutes=2),
+                deviceId="device-a",
+            )
+        )
+        structural_score = phase_one.score_transaction(
+            transaction(
+                "plain-earlier",
+                "A",
+                "B",
+                when=BASE_TIME + timedelta(minutes=1),
+            )
+        )
+
+        phase_two = GhostChainsEngine()
+        phase_two.score_transaction(
+            transaction(
+                "rich-downstream",
+                "B",
+                "C",
+                when=BASE_TIME + timedelta(minutes=2),
+                deviceId="device-a",
+            )
+        )
+        no_dropout_score = phase_two.score_transaction(
+            transaction(
+                "rich-earlier",
+                "A",
+                "B",
+                when=BASE_TIME + timedelta(minutes=1),
+            )
+        )
+
+        self.assertEqual(no_dropout_score, structural_score)
+
+    def test_missing_identity_in_a_causal_middle_leg_is_a_dropout(self):
+        phase_one = Phase1Engine()
+        phase_two = GhostChainsEngine()
+        plain_history = [
+            transaction("plain-upstream", "A", "B", deviceId="device-a"),
+            transaction(
+                "plain-downstream",
+                "C",
+                "D",
+                when=BASE_TIME + timedelta(minutes=2),
+                deviceId="device-a",
+            ),
+        ]
+        rich_history = [
+            transaction("rich-upstream", "A", "B", deviceId="device-a"),
+            transaction(
+                "rich-downstream",
+                "C",
+                "D",
+                when=BASE_TIME + timedelta(minutes=2),
+                deviceId="device-a",
+            ),
+        ]
+        phase_one.score_batch(plain_history)
+        phase_two.score_batch(rich_history)
+
+        structural_score = phase_one.score_transaction(
+            transaction(
+                "plain-middle",
+                "B",
+                "C",
+                when=BASE_TIME + timedelta(minutes=1),
+            )
+        )
+        dropout_score = phase_two.score_transaction(
+            transaction(
+                "rich-middle",
+                "B",
+                "C",
+                when=BASE_TIME + timedelta(minutes=1),
+            )
+        )
+
+        self.assertGreater(dropout_score, structural_score)
+
 
 class DisconnectedIdentityTests(unittest.TestCase):
     def test_reuse_across_disconnected_components_is_low_but_accumulates(self):
@@ -212,6 +363,24 @@ class DisconnectedIdentityTests(unittest.TestCase):
                 "C",
                 "D",
                 when=BASE_TIME + timedelta(hours=24, microseconds=1),
+                ipAddress="10.0.0.1",
+            )
+        )
+
+        self.assertEqual(score, 0.0)
+
+    def test_identity_at_the_exact_window_boundary_is_expired(self):
+        engine = GhostChainsEngine()
+        engine.score_transaction(
+            transaction("boundary-old", "A", "B", ipAddress="10.0.0.1")
+        )
+
+        score = engine.score_transaction(
+            transaction(
+                "boundary-new",
+                "C",
+                "D",
+                when=BASE_TIME + timedelta(hours=24),
                 ipAddress="10.0.0.1",
             )
         )
