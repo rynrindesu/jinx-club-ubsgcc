@@ -90,10 +90,28 @@ def _pre_reveal_move(
     if estimate.confidence == "unknown":
         if to_call == 0:
             return _fallback(payload, "check")
+        if risk.delta <= -10:
+            return _fallback(payload, "fold")
         if is_button and not actions and "call" in _legal_actions(payload):
             return {"action": "call"}
         if to_call <= big_blind and to_call < stack:
             return _fallback(payload, "call")
+        return _fallback(payload, "fold")
+
+    # A partially identified rule must never recreate the calibration
+    # attempt's 23-29 chip losses.  Information has value, but only at a
+    # literal small-blind/big-blind price; large bets wait for a trusted rule.
+    if (
+        estimate.confidence == "partial"
+        and to_call > 0
+        and not _partial_exposure_allowed(
+            payload=payload,
+            to_call=to_call,
+            pot=pot,
+            big_blind=big_blind,
+            estimate=estimate,
+        )
+    ):
         return _fallback(payload, "fold")
 
     margin = 0.08 if estimate.confidence == "partial" else 0.045
@@ -141,7 +159,20 @@ def _pre_reveal_move(
 
     pot_odds = to_call / max(1, pot + to_call)
     facing_reraise = _we_wagered_this_round(payload)
-    required = max(pot_odds + margin, 0.61 if facing_reraise else 0.45)
+    reraise_floor = 0.90 if risk.protect else 0.80
+    required = max(
+        pot_odds + margin,
+        reraise_floor if facing_reraise else 0.45,
+    )
+    if not _call_exposure_allowed(
+        to_call=to_call,
+        stack=stack,
+        big_blind=big_blind,
+        conservative=conservative,
+        estimate=estimate,
+        risk=risk,
+    ):
+        return _fallback(payload, "fold")
     if conservative >= required and to_call <= stack:
         if (
             conservative >= 0.76
@@ -167,6 +198,7 @@ def _pre_reveal_move(
     if (
         estimate.confidence == "partial"
         and not risk.protect
+        and risk.delta > -10
         and to_call <= big_blind
         and estimate.mean >= pot_odds
         and to_call < stack
@@ -189,12 +221,27 @@ def _post_reveal_move(
     if estimate.confidence == "unknown":
         if to_call == 0:
             return _fallback(payload, "check")
+        if risk.delta <= -10:
+            return _fallback(payload, "fold")
         # Calling normally closes heads-up action and exposes both numbers.
         # Cap the calibration cost tightly; an unknown pair is still unknown.
         pot_before_bet = max(1, pot - to_call)
         cheap = to_call <= big_blind or to_call / pot_before_bet <= 0.20
         if cheap and to_call < stack and not risk.protect:
             return _fallback(payload, "call")
+        return _fallback(payload, "fold")
+
+    if (
+        estimate.confidence == "partial"
+        and to_call > 0
+        and not _partial_exposure_allowed(
+            payload=payload,
+            to_call=to_call,
+            pot=pot,
+            big_blind=big_blind,
+            estimate=estimate,
+        )
+    ):
         return _fallback(payload, "fold")
 
     conservative = (
@@ -216,11 +263,30 @@ def _post_reveal_move(
         pot_odds = to_call / max(1, pot + to_call)
         fresh_fraction = to_call / max(1, pot - to_call)
         range_floor = 0.43
+        if fresh_fraction > 0.35:
+            range_floor = 0.64
         if fresh_fraction > 0.55:
-            range_floor = 0.56
+            range_floor = 0.78
         if fresh_fraction > 1.05:
-            range_floor = 0.66
-        required = max(pot_odds + 0.055 + adjustment, range_floor + adjustment)
+            range_floor = 0.88
+        if _we_wagered_this_round(payload) and fresh_fraction > 0.35:
+            range_floor = max(range_floor, 0.80)
+        if risk.protect and fresh_fraction > 0.35:
+            range_floor = max(range_floor, 0.86)
+        required = max(
+            pot_odds + 0.055 + adjustment,
+            range_floor + max(0.0, adjustment),
+        )
+
+        if not _call_exposure_allowed(
+            to_call=to_call,
+            stack=stack,
+            big_blind=big_blind,
+            conservative=conservative,
+            estimate=estimate,
+            risk=risk,
+        ):
+            return _fallback(payload, "fold")
 
         if conservative >= required:
             if (
@@ -241,6 +307,7 @@ def _post_reveal_move(
         if (
             estimate.confidence == "partial"
             and not risk.protect
+            and risk.delta > -10
             and to_call <= big_blind
             and estimate.mean >= pot_odds + 0.02
             and to_call < stack
@@ -257,7 +324,13 @@ def _post_reveal_move(
         value_threshold += 0.025
     if conservative >= value_threshold:
         fraction = 0.65 if profile.calling_station else 0.50
-        if risk.desperate and conservative >= 0.72:
+        if estimate.confidence == "partial":
+            fraction = 1 / 3
+        if (
+            risk.desperate
+            and estimate.confidence == "learned"
+            and conservative >= 0.72
+        ):
             fraction = 0.75
         return _pot_wager(
             payload,
@@ -308,9 +381,9 @@ def _risk_context(payload: Mapping[str, Any]) -> RiskContext:
     coast_floor = delta - committed - future_blinds
     secure_current = coast_floor >= 25
     protect = (
-        (remaining <= 4 and delta >= 25 + 2 * remaining)
-        or (remaining <= 8 and delta >= 34)
-        or secure_current
+        secure_current
+        or delta >= 30
+        or (remaining <= 12 and delta >= 25)
     )
     desperate = (
         (remaining <= 6 and delta < 20)
@@ -323,6 +396,63 @@ def _risk_context(payload: Mapping[str, Any]) -> RiskContext:
         protect=protect,
         desperate=desperate,
     )
+
+
+def _partial_exposure_allowed(
+    *,
+    payload: Mapping[str, Any],
+    to_call: int,
+    pot: int,
+    big_blind: int,
+    estimate: EquityEstimate,
+) -> bool:
+    """Permit only cheap calibration calls before a rule is trusted."""
+
+    starting_stack = max(1, _integer(payload.get("starting_stack"), 200))
+    exposure_cap = max(2 * big_blind, round(0.04 * starting_stack))
+    if _current_hand_commitment(payload) + to_call > exposure_cap:
+        return False
+    if to_call <= big_blind:
+        return True
+    pot_before_wager = max(1, pot - to_call)
+    if to_call <= 2 * big_blind and to_call / pot_before_wager <= 0.20:
+        return True
+    return (
+        to_call <= 4 * big_blind
+        and estimate.lower >= 0.90
+        and estimate.coverage >= 0.95
+    )
+
+
+def _call_exposure_allowed(
+    *,
+    to_call: int,
+    stack: int,
+    big_blind: int,
+    conservative: float,
+    estimate: EquityEstimate,
+    risk: RiskContext,
+) -> bool:
+    """Reject stack-threatening calls unless the rule proves near-nut equity."""
+
+    if to_call <= 0:
+        return True
+    proven_nuts = estimate.confidence == "learned" and conservative >= 0.94
+    if to_call >= stack:
+        return proven_nuts
+    if to_call / max(1, stack) >= 0.35 and conservative < 0.90:
+        return False
+    score_cushion = max(big_blind, risk.delta - 25)
+    if risk.delta >= 25 and to_call > score_cushion and not proven_nuts:
+        return False
+    return True
+
+
+def _current_hand_commitment(payload: Mapping[str, Any]) -> int:
+    starting = max(1, _integer(payload.get("starting_stack"), 200))
+    delta = _your_chip_delta(payload)
+    stack = max(0, _integer(payload.get("your_stack"), 0))
+    return max(0, starting + delta - stack)
 
 
 def _future_forced_bets(payload: Mapping[str, Any], future_hands: int) -> int:
