@@ -111,6 +111,18 @@ def _center_far_low(number: int, _community: int) -> Rank:
     return (abs(number - CENTER), -number)
 
 
+def _center_match_high(number: int, _community: int) -> Rank:
+    """Rank the exact center number first, then prefer higher numbers."""
+
+    return (int(number == CENTER), number)
+
+
+def _center_match_low(number: int, _community: int) -> Rank:
+    """Rank the exact center number first, then prefer lower numbers."""
+
+    return (int(number == CENTER), -number)
+
+
 _BASE_EVALUATORS: tuple[tuple[str, float, RankEvaluator], ...] = (
     ("raw-high", 1.0, _raw_high),
     ("raw-low", 1.0, _raw_low),
@@ -122,6 +134,8 @@ _BASE_EVALUATORS: tuple[tuple[str, float, RankEvaluator], ...] = (
     ("center-near-low", 1.8, _center_near_low),
     ("center-far-high", 1.8, _center_far_high),
     ("center-far-low", 1.8, _center_far_low),
+    ("center-match-high", 1.7, _center_match_high),
+    ("center-match-low", 1.7, _center_match_low),
 )
 
 

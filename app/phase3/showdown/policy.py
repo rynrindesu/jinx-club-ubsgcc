@@ -91,6 +91,79 @@ class HighVariancePolicy:
 
         candidates = self._candidates(request, responders)
         remaining_hands = max(0, request.total_hands - request.hand_number)
+        base_metrics = metrics_for(player.seat for player in opponents)
+        confidence = float(rule_model.confidence())
+        scouting = (
+            request.hand_number <= self.config.scout_hands
+            and confidence < self.config.scout_confidence
+        )
+
+        # Phase-2's strongest lesson was that calibration must be genuinely
+        # cheap.  This is a hard exposure cap, not a soft utility penalty: the
+        # failed scout called 132 chips on hand one under an unknown codename.
+        if scouting:
+            remaining_budget = max(
+                0,
+                self.config.scout_call_budget
+                - self._observed_scout_calls(request),
+            )
+            candidates = [
+                candidate
+                for candidate in candidates
+                if candidate.action not in {"bet", "raise"}
+                and not (
+                    candidate.action == "call"
+                    and self._hero_extra(request, candidate) > remaining_budget
+                )
+            ]
+
+        hero_aggressed = any(
+            action.seat == request.your_seat
+            and action.round == request.round
+            and action.action in {"bet", "raise"}
+            for action in request.current_hand_actions
+        )
+        leader = max(
+            (
+                player.chip_delta
+                for player in request.players
+                if player.seat != request.your_seat
+            ),
+            default=0,
+        )
+        desperate = remaining_hands < self.config.endgame_hands and (
+            request.own_player.chip_delta < max(10, leader + 1)
+        )
+
+        # Avoid the repeated bet/re-raise/fold leak: make at most one voluntary
+        # wager per street unless the showdown is exceptionally strong or the
+        # exact late-leg target requires the extra variance.
+        if hero_aggressed and not desperate and base_metrics.sole_win_probability < 0.80:
+            candidates = [
+                candidate for candidate in candidates if candidate.action != "raise"
+            ]
+            if request.to_call:
+                pot_odds = request.to_call / max(1, request.pot + request.to_call)
+                if base_metrics.expected_share < max(0.60, pot_odds + 0.08):
+                    candidates = [
+                        candidate for candidate in candidates if candidate.action != "call"
+                    ]
+
+        # Full-stack wagers remain available for genuine late desperation, but
+        # not as an early default.  This keeps the retry policy aggressive
+        # without turning every leg into the observed -200/+1000 coin flip.
+        if not desperate and not (
+            confidence >= self.config.scout_confidence
+            and base_metrics.sole_win_probability >= 0.80
+        ):
+            candidates = [
+                candidate
+                for candidate in candidates
+                if not (
+                    candidate.action in {"bet", "raise"}
+                    and self._hero_extra(request, candidate) >= request.your_stack
+                )
+            ]
 
         # In the closing hands, do not risk a qualifying unique lead when a
         # passive legal action survives even the worst award of the current pot.
@@ -108,11 +181,7 @@ class HighVariancePolicy:
         if remaining_hands == 0 and not self._passive_can_clear(request):
             if any(candidate.action in {"bet", "raise"} for candidate in candidates):
                 candidates = [candidate for candidate in candidates if candidate.action != "check"]
-        if (
-            request.hand_number <= self.config.scout_hands
-            and rule_model.confidence() < self.config.scout_confidence
-            and equity_for(player.seat for player in opponents) < 0.75
-        ):
+        if scouting and equity_for(player.seat for player in opponents) < 0.75:
             candidates = [
                 candidate
                 for candidate in candidates
