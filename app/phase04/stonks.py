@@ -658,7 +658,7 @@ def _simulate_sweep(
         listings_by_year.setdefault(listing.year, []).append((index, listing))
 
     cash = capital
-    used_lots: set[int] = set()
+    remaining_lots = [listing.qty for listing in listings]
     scheduled_sales: dict[int, list[tuple[str, int, int]]] = {}
     actions: list[str] = []
 
@@ -672,7 +672,8 @@ def _simulate_sweep(
 
         candidates: list[tuple[int, _Listing, int, int]] = []
         for listing_index, listing in listings_by_year.get(year, ()):
-            if listing_index in used_lots:
+            available = remaining_lots[listing_index]
+            if available <= 0:
                 continue
             cache_key = (sale_policy, route_index, listing_index)
             if cache_key not in target_cache:
@@ -683,8 +684,14 @@ def _simulate_sweep(
             if target is None:
                 continue
             target_index, sell_price = target
+            available_listing = _Listing(
+                listing.year,
+                listing.stock,
+                listing.price,
+                available,
+            )
             candidates.append(
-                (listing_index, listing, target_index, sell_price)
+                (listing_index, available_listing, target_index, sell_price)
             )
 
         candidates.sort(
@@ -744,7 +751,7 @@ def _simulate_sweep(
                     continue
 
             cash -= quantity * listing.price
-            used_lots.add(listing_index)
+            remaining_lots[listing_index] -= quantity
             actions.append(f"b-{listing.stock}-{quantity}")
             scheduled_sales.setdefault(target_index, []).append(
                 (listing.stock, quantity, sell_price)
