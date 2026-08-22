@@ -9,7 +9,9 @@ return sweep, so routing and choosing the purchases separate cleanly.
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
+from math import gcd
 from typing import Any
 
 
@@ -26,16 +28,6 @@ class _Lot:
     qty: int
     sell_year: int
     unit_profit: int
-
-
-@dataclass(frozen=True, slots=True)
-class _Item:
-    """A binary-split 0/1 representation of part of a bounded lot."""
-
-    lot_index: int
-    qty: int
-    cost: int
-    profit: int
 
 
 def _quoted_range(
@@ -94,62 +86,125 @@ def _build_lots(quotes: dict[int, dict[str, tuple[int, int]]]) -> list[_Lot]:
     return lots
 
 
-def _binary_items(lots: list[_Lot]) -> list[_Item]:
-    """Convert bounded lots into 0/1 knapsack items in logarithmic space."""
+def _scaled_capacity(capital: int, lots: list[_Lot]) -> tuple[int, int]:
+    """Reduce the DP axis by the common divisor of every purchase price."""
 
-    items: list[_Item] = []
-    for lot_index, lot in enumerate(lots):
-        remaining = lot.qty
-        chunk = 1
-        while remaining:
-            quantity = min(chunk, remaining)
-            items.append(
-                _Item(
-                    lot_index=lot_index,
-                    qty=quantity,
-                    cost=quantity * lot.price,
-                    profit=quantity * lot.unit_profit,
+    max_spend = min(capital, sum(lot.price * lot.qty for lot in lots))
+    price_divisor = 0
+    for lot in lots:
+        price_divisor = gcd(price_divisor, lot.price)
+    return max_spend // price_divisor, price_divisor
+
+
+def _bounded_values(
+    lots: list[_Lot],
+    start: int,
+    stop: int,
+    capacity: int,
+    price_divisor: int,
+) -> list[int]:
+    """Compute exact bounded-knapsack values in O(lots * capacity) time.
+
+    The standard binary-split form needs one traceback row for every split
+    item.  Instead, this applies every bounded lot with the monotone-queue
+    optimization, one residue class at a time.  It mutates one value row in
+    place, so a DP pass uses O(capacity) memory irrespective of quantities.
+    """
+
+    values = [0] * (capacity + 1)
+    for lot in lots[start:stop]:
+        weight = lot.price // price_divisor
+        limit = min(lot.qty, capacity // weight)
+        if limit == 0:
+            continue
+
+        for residue in range(min(weight, capacity + 1)):
+            final_index = (capacity - residue) // weight
+            first_index = max(0, final_index - limit)
+            indexes: deque[int] = deque()
+            scores: deque[int] = deque()
+
+            def add_candidate(index: int) -> None:
+                score = values[residue + index * weight] - index * lot.unit_profit
+                while scores and scores[-1] <= score:
+                    scores.pop()
+                    indexes.pop()
+                indexes.append(index)
+                scores.append(score)
+
+            # Scanning from high to low keeps every source cell unchanged
+            # until it has left the transition window, permitting in-place DP.
+            for index in range(final_index, first_index - 1, -1):
+                add_candidate(index)
+
+            for index in range(final_index, -1, -1):
+                values[residue + index * weight] = (
+                    index * lot.unit_profit + scores[0]
                 )
-            )
-            remaining -= quantity
-            chunk *= 2
-    return items
+                next_index = index - 1
+                while indexes and indexes[0] > next_index:
+                    indexes.popleft()
+                    scores.popleft()
+                incoming_index = next_index - limit
+                if incoming_index >= 0:
+                    add_candidate(incoming_index)
+
+    return values
+
+
+def _reconstruct_quantities(
+    lots: list[_Lot],
+    start: int,
+    stop: int,
+    capacity: int,
+    price_divisor: int,
+    selected: list[int],
+) -> None:
+    """Recover an optimum without retaining a full traceback matrix.
+
+    Each split recomputes one value row for its left and right halves, finds
+    the best budget division, then recurses.  This is a Hirschberg-style
+    trade: O(capacity) workspace rather than O(lots * capacity) storage while
+    retaining the exact optimum.
+    """
+
+    if start == stop or capacity == 0:
+        return
+    if stop - start == 1:
+        lot = lots[start]
+        selected[start] = min(lot.qty, capacity // (lot.price // price_divisor))
+        return
+
+    middle = (start + stop) // 2
+    left_values = _bounded_values(lots, start, middle, capacity, price_divisor)
+    right_values = _bounded_values(lots, middle, stop, capacity, price_divisor)
+
+    left_capacity = max(
+        range(capacity + 1),
+        key=lambda budget: left_values[budget] + right_values[capacity - budget],
+    )
+    del left_values
+    del right_values
+
+    _reconstruct_quantities(
+        lots, start, middle, left_capacity, price_divisor, selected
+    )
+    _reconstruct_quantities(
+        lots, middle, stop, capacity - left_capacity, price_divisor, selected
+    )
 
 
 def _choose_lots(capital: int, lots: list[_Lot]) -> list[int]:
-    """Return optimal purchase quantities by exact bounded-knapsack DP."""
+    """Return optimal purchase quantities with an exact bounded-knapsack DP."""
 
     if capital <= 0 or not lots:
         return [0] * len(lots)
 
-    # No solution can spend more than the available stock costs.  Capping the
-    # table at that amount avoids allocating an enormous, all-unused tail when
-    # capital is much greater than the available inventory.
-    capacity = min(capital, sum(lot.price * lot.qty for lot in lots))
-    items = _binary_items(lots)
-    profits = [0] * (capacity + 1)
-    # One byte per (item, budget) makes traceback compact even when an item
-    # improves many budgets.  A linked object per improvement can otherwise
-    # consume far more memory than the DP table itself.
-    took_item = [bytearray(capacity + 1) for _ in items]
-
-    for item_index, item in enumerate(items):
-        if item.cost > capacity:
-            continue
-        for budget in range(capacity, item.cost - 1, -1):
-            candidate = profits[budget - item.cost] + item.profit
-            if candidate > profits[budget]:
-                profits[budget] = candidate
-                took_item[item_index][budget] = 1
-
+    capacity, price_divisor = _scaled_capacity(capital, lots)
     selected = [0] * len(lots)
-    budget = capacity
-    for item_index in range(len(items) - 1, -1, -1):
-        if not took_item[item_index][budget]:
-            continue
-        item = items[item_index]
-        selected[item.lot_index] += item.qty
-        budget -= item.cost
+    _reconstruct_quantities(
+        lots, 0, len(lots), capacity, price_divisor, selected
+    )
     return selected
 
 
