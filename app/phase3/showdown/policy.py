@@ -142,20 +142,46 @@ class HighVariancePolicy:
         if request.to_call and not desperate:
             call_cost = min(request.your_stack, request.to_call)
             exposure = call_cost / max(1, request.your_stack)
+            current_commitment = self._branch_contributions(
+                request, 0, {}
+            ).get(request.your_seat, request.own_player.bet_this_round)
+            cumulative_exposure = (current_commitment + call_cost) / max(
+                1, request.starting_stack
+            )
             pot_odds = call_cost / max(1, request.pot + call_cost)
             call_is_robust = (
                 base_metrics.expected_share >= max(0.58, pot_odds + 0.10)
                 and base_metrics.sole_win_probability >= 0.45
+            )
+            # Repeated individually-small calls were still able to commit most
+            # of a stack (189 chips before the reveal in the third replay).
+            # Once a hand crosses a quarter of the starting stack, require a
+            # genuine multiway sole-win edge rather than evaluating only the
+            # latest increment.
+            cumulative_call_is_robust = (
+                base_metrics.expected_share >= max(0.70, pot_odds + 0.10)
+                and base_metrics.sole_win_probability >= 0.62
             )
             all_in_is_robust = (
                 base_metrics.expected_share >= max(0.72, pot_odds + 0.12)
                 and base_metrics.sole_win_probability >= 0.72
             )
             if (exposure >= 0.25 and not call_is_robust) or (
+                cumulative_exposure >= 0.25 and not cumulative_call_is_robust
+            ) or (
                 call_cost >= request.your_stack and not all_in_is_robust
             ):
                 candidates = [
                     candidate for candidate in candidates if candidate.action != "call"
+                ]
+            if not cumulative_call_is_robust:
+                cumulative_limit = 0.25 * request.starting_stack
+                candidates = [
+                    candidate
+                    for candidate in candidates
+                    if candidate.action not in {"bet", "raise"}
+                    or current_commitment + self._hero_extra(request, candidate)
+                    < cumulative_limit
                 ]
 
         # Avoid the repeated bet/re-raise/fold leak: make at most one voluntary

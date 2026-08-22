@@ -57,11 +57,73 @@ class StonksTests(unittest.TestCase):
             "capital": 100,
             "timeline": {
                 "2037": {"A": {"price": 5, "qty": 100}},
-                "2036": {"A": {"price": 10, "qty": 100}},
+                "2036": {"A": {"price": 5, "qty": 100}},
             },
         }
 
         self.assertEqual(solve_case(case), [])
+
+    def test_can_sell_in_an_earlier_calendar_year(self):
+        case = {
+            "energy": 4,
+            "capital": 10,
+            "timeline": {
+                "2037": {"A": {"price": 5, "qty": 2}},
+                "2035": {"A": {"price": 20, "qty": 0}},
+            },
+        }
+
+        self.assertEqual(
+            solve_case(case),
+            [
+                "b-A-2",
+                "j-2037-2035",
+                "s-A-2",
+                "j-2035-2037",
+            ],
+        )
+
+    def test_can_hold_multiple_stocks_during_one_sweep(self):
+        case = {
+            "energy": 4,
+            "capital": 20,
+            "timeline": {
+                "2037": {
+                    "A": {"price": 10, "qty": 0},
+                    "B": {"price": 10, "qty": 0},
+                },
+                "2036": {"B": {"price": 5, "qty": 1}},
+                "2035": {"A": {"price": 5, "qty": 1}},
+            },
+        }
+
+        actions = solve_case(case)
+
+        self.assertIn("b-A-1", actions)
+        self.assertIn("b-B-1", actions)
+        self.assertIn("s-A-1", actions)
+        self.assertIn("s-B-1", actions)
+
+    def test_sweep_can_turn_at_a_sell_only_year(self):
+        case = {
+            "energy": 4,
+            "capital": 20,
+            "timeline": {
+                "2037": {"A": {"price": 5, "qty": 1}},
+                "2036": {"B": {"price": 5, "qty": 1}},
+                "2035": {
+                    "A": {"price": 10, "qty": 0},
+                    "B": {"price": 10, "qty": 0},
+                },
+            },
+        }
+
+        actions = solve_case(case)
+
+        self.assertIn("b-A-1", actions)
+        self.assertIn("b-B-1", actions)
+        self.assertIn("s-A-1", actions)
+        self.assertIn("s-B-1", actions)
 
 if __name__ == "__main__":
     unittest.main()

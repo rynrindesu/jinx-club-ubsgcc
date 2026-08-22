@@ -2,7 +2,7 @@
 
 Every state produced by this module is deliberately liquid (it holds cash and
 no shares).  A transition jumps to one year, buys one or more stocks there,
-jumps to a later quoted year, and sells everything bought by that transition.
+jumps to another quoted year, and sells everything bought by that transition.
 That makes every emitted prefix legal and lets the search safely stop at any
 point before returning to 2037.
 """
@@ -18,7 +18,7 @@ from typing import Any, Iterable
 PRESENT_YEAR = 2037
 _BEAM_WIDTH = 96
 _MAX_DEPTH = 96
-_MAX_GROUPS = 120
+_MAX_GROUPS = 400
 _MAX_TRANSITIONS = 64
 
 
@@ -96,7 +96,7 @@ def _parse_case(
             qty = int(raw_quote["qty"])
             stock_name = str(stock)
             year_prices[stock_name] = price
-            if qty > 0 and year < PRESENT_YEAR:
+            if qty > 0 and year <= PRESENT_YEAR:
                 listings.append(_Listing(year, stock_name, price, qty))
         prices[year] = year_prices
 
@@ -114,7 +114,7 @@ def _build_groups(
         for sell_year, sell_prices in prices.items():
             sell_price = sell_prices.get(listing.stock)
             if (
-                sell_year <= listing.year
+                sell_year == listing.year
                 or sell_year > PRESENT_YEAR
                 or sell_price is None
                 or sell_price <= listing.price
@@ -151,14 +151,21 @@ def _build_groups(
         )
     )
     if len(result) > _MAX_GROUPS:
+        slice_size = _MAX_GROUPS // 4
         nearest = sorted(
             result,
             key=lambda group: (
                 PRESENT_YEAR - group[0][0],
-                group[0][1] - group[0][0],
+                abs(group[0][1] - group[0][0]),
             ),
-        )[: _MAX_GROUPS // 3]
-        selected = result[: _MAX_GROUPS - len(nearest)] + nearest
+        )[:slice_size]
+        cheapest = sorted(
+            result,
+            key=lambda group: min(
+                opportunity.buy_price for opportunity in group[1]
+            ),
+        )[:slice_size]
+        selected = result[: _MAX_GROUPS // 2] + nearest + cheapest
         deduplicated = {years: opportunities for years, opportunities in selected}
         result = sorted(deduplicated.items())
     return result
@@ -193,7 +200,7 @@ def _make_transition(
     ordered: tuple[_Opportunity, ...],
     energy: int,
 ) -> _Transition | None:
-    travel = abs(state.year - buy_year) + (sell_year - buy_year)
+    travel = abs(state.year - buy_year) + abs(sell_year - buy_year)
     if state.energy_used + travel + (PRESENT_YEAR - sell_year) > energy:
         return None
 
@@ -247,6 +254,22 @@ def _candidate_transitions(
             previous = candidates.get(fingerprint)
             if previous is None or transition.gain > previous.gain:
                 candidates[fingerprint] = transition
+
+        # Preserve every single-stock choice as well.  A lower-ratio stock can
+        # be the best integer purchase when the higher-ratio price leaves cash
+        # stranded, and it may preserve other one-use lots for later trips.
+        for opportunity in opportunities:
+            transition = _make_transition(
+                state, buy_year, sell_year, (opportunity,), energy
+            )
+            if transition is None:
+                continue
+            fingerprint = (
+                buy_year,
+                sell_year,
+                ((opportunity.listing_index, transition.purchases[0][1]),),
+            )
+            candidates[fingerprint] = transition
 
     transitions = list(candidates.values())
     if len(transitions) <= _MAX_TRANSITIONS:
@@ -356,13 +379,295 @@ def _trim_frontier(
     return list(unique.values())
 
 
+def _sweep_route(minimum_year: int, prices: dict[int, dict[str, int]]) -> list[int]:
+    """Visit every quoted year on both sides of one pastward round trip."""
+
+    interior = sorted(
+        (year for year in prices if minimum_year <= year < PRESENT_YEAR),
+        reverse=True,
+    )
+    if minimum_year not in interior:
+        interior.append(minimum_year)
+    inbound = sorted(year for year in interior if year > minimum_year)
+    return [PRESENT_YEAR, *interior, *inbound, PRESENT_YEAR]
+
+
+def _future_sale(
+    route: list[int],
+    route_index: int,
+    listing: _Listing,
+    prices: dict[int, dict[str, int]],
+    policy: str,
+) -> tuple[int, int] | None:
+    candidates: list[tuple[int, int, int]] = []
+    distance = 0
+    for target_index in range(route_index + 1, len(route)):
+        distance += abs(route[target_index] - route[target_index - 1])
+        sell_price = prices.get(route[target_index], {}).get(listing.stock)
+        if sell_price is not None and sell_price > listing.price:
+            candidates.append((target_index, sell_price, distance))
+    if not candidates:
+        return None
+
+    if policy == "earliest":
+        target_index, sell_price, _ = candidates[0]
+    elif policy == "quick_profit":
+        target_index, sell_price, _ = max(
+            candidates,
+            key=lambda item: (
+                Fraction(item[1] - listing.price, item[2]),
+                item[1],
+                -item[0],
+            ),
+        )
+    elif policy == "home":
+        home_candidates = [
+            candidate
+            for candidate in candidates
+            if route[candidate[0]] == PRESENT_YEAR
+        ]
+        if not home_candidates:
+            return None
+        target_index, sell_price, _ = max(
+            home_candidates,
+            key=lambda item: (item[1], -item[0]),
+        )
+    else:  # peak
+        target_index, sell_price, _ = max(
+            candidates,
+            key=lambda item: (item[1], -item[0]),
+        )
+    return target_index, sell_price
+
+
+def _buy_order_key(
+    candidate: tuple[int, _Listing, int, int], policy: str
+) -> tuple[Any, ...]:
+    _, listing, target_index, sell_price = candidate
+    profit = sell_price - listing.price
+    if policy == "unit_profit":
+        return (-profit, listing.price, listing.stock)
+    if policy == "cheap":
+        return (listing.price, -Fraction(profit, listing.price), listing.stock)
+    if policy == "quick":
+        return (
+            target_index,
+            -Fraction(profit, listing.price),
+            listing.stock,
+        )
+    if policy == "total_profit":
+        return (-profit * listing.qty, -Fraction(profit, listing.price), listing.stock)
+    return (-Fraction(profit, listing.price), -profit, listing.stock)
+
+
+def _knapsack_quantities(
+    candidates: list[tuple[int, _Listing, int, int]], budget: int
+) -> list[int] | None:
+    """Exactly allocate modest cash balances across one stop's stock lots."""
+
+    affordable_units = sum(
+        min(listing.qty, budget // listing.price)
+        for _, listing, _, _ in candidates
+    )
+    if budget > 5_000 or len(candidates) > 12 or affordable_units > 120:
+        return None
+
+    # spent -> (eventual profit, quantities chosen for processed candidates)
+    states: dict[int, tuple[int, tuple[int, ...]]] = {0: (0, ())}
+    for _, listing, _, sell_price in candidates:
+        next_states: dict[int, tuple[int, tuple[int, ...]]] = {}
+        for spent, (profit, quantities) in states.items():
+            max_quantity = min(
+                listing.qty, (budget - spent) // listing.price
+            )
+            for quantity in range(max_quantity + 1):
+                new_spent = spent + quantity * listing.price
+                candidate_value = (
+                    profit + quantity * (sell_price - listing.price),
+                    quantities + (quantity,),
+                )
+                previous = next_states.get(new_spent)
+                if previous is None or candidate_value[0] > previous[0]:
+                    next_states[new_spent] = candidate_value
+        states = next_states
+
+    _, (_, quantities) = max(
+        states.items(),
+        key=lambda item: (item[1][0], -item[0]),
+    )
+    return list(quantities)
+
+
+def _simulate_sweep(
+    route: list[int],
+    capital: int,
+    listings: list[_Listing],
+    prices: dict[int, dict[str, int]],
+    sale_policy: str,
+    buy_policy: str,
+    target_cache: dict[tuple[str, int, int], tuple[int, int] | None],
+) -> tuple[int, list[str]]:
+    listings_by_year: dict[int, list[tuple[int, _Listing]]] = {}
+    for index, listing in enumerate(listings):
+        listings_by_year.setdefault(listing.year, []).append((index, listing))
+
+    cash = capital
+    used_lots: set[int] = set()
+    scheduled_sales: dict[int, list[tuple[str, int, int]]] = {}
+    actions: list[str] = []
+
+    for route_index, year in enumerate(route):
+        if route_index > 0 and route[route_index - 1] != year:
+            actions.append(f"j-{route[route_index - 1]}-{year}")
+
+        for stock, quantity, sell_price in scheduled_sales.get(route_index, ()):
+            cash += quantity * sell_price
+            actions.append(f"s-{stock}-{quantity}")
+
+        candidates: list[tuple[int, _Listing, int, int]] = []
+        for listing_index, listing in listings_by_year.get(year, ()):
+            if listing_index in used_lots:
+                continue
+            cache_key = (sale_policy, route_index, listing_index)
+            if cache_key not in target_cache:
+                target_cache[cache_key] = _future_sale(
+                    route, route_index, listing, prices, sale_policy
+                )
+            target = target_cache[cache_key]
+            if target is None:
+                continue
+            target_index, sell_price = target
+            candidates.append(
+                (listing_index, listing, target_index, sell_price)
+            )
+
+        candidates.sort(key=lambda item: _buy_order_key(item, buy_policy))
+        quantities = (
+            _knapsack_quantities(candidates, cash)
+            if buy_policy == "knapsack"
+            else None
+        )
+        for candidate_index, (
+            listing_index,
+            listing,
+            target_index,
+            sell_price,
+        ) in enumerate(candidates):
+            quantity = (
+                quantities[candidate_index]
+                if quantities is not None
+                else min(listing.qty, cash // listing.price)
+            )
+            if quantity <= 0:
+                continue
+            cash -= quantity * listing.price
+            used_lots.add(listing_index)
+            actions.append(f"b-{listing.stock}-{quantity}")
+            scheduled_sales.setdefault(target_index, []).append(
+                (listing.stock, quantity, sell_price)
+            )
+
+    return cash, actions
+
+
+def _best_sweep(
+    energy: int,
+    capital: int,
+    listings: list[_Listing],
+    prices: dict[int, dict[str, int]],
+) -> tuple[int, list[str]]:
+    reachable = sorted(
+        {
+            year
+            for year in prices
+            if year < PRESENT_YEAR
+            and 2 * (PRESENT_YEAR - year) <= energy
+        }
+    )
+    if not reachable:
+        return capital, []
+
+    # Trying several turning points helps a greedy policy avoid tying up cash on
+    # an unnecessarily deep route, while keeping large timelines inexpensive.
+    route_limit = 4 if len(listings) > 250 else 8 if len(listings) > 80 else 16
+    if len(reachable) > route_limit:
+        positions = {
+            round(index * (len(reachable) - 1) / (route_limit - 1))
+            for index in range(route_limit)
+        }
+        reachable = [reachable[index] for index in sorted(positions)]
+
+    best_cash = capital
+    best_actions: list[str] = []
+    sale_policies = (
+        ("peak", "earliest", "quick_profit")
+        if len(listings) > 250
+        else ("peak", "earliest", "quick_profit", "home")
+    )
+    buy_policies = (
+        ("roi", "cheap", "quick", "total_profit")
+        if len(listings) > 80
+        else (
+            "roi",
+            "unit_profit",
+            "cheap",
+            "quick",
+            "total_profit",
+            "knapsack",
+        )
+    )
+    for minimum_year in reachable:
+        route = _sweep_route(minimum_year, prices)
+        if sum(
+            abs(right - left)
+            for left, right in zip(route, route[1:])
+        ) > energy:
+            continue
+        target_cache: dict[
+            tuple[str, int, int], tuple[int, int] | None
+        ] = {}
+        for sale_policy in sale_policies:
+            for buy_policy in buy_policies:
+                cash, actions = _simulate_sweep(
+                    route,
+                    capital,
+                    listings,
+                    prices,
+                    sale_policy,
+                    buy_policy,
+                    target_cache,
+                )
+                if cash > best_cash or (
+                    cash == best_cash and len(actions) < len(best_actions)
+                ):
+                    best_cash = cash
+                    best_actions = actions
+    return best_cash, best_actions
+
+
 def solve_case(case: dict[str, Any]) -> list[str]:
     """Return a profitable, energy-safe action sequence for one test case."""
 
     energy, capital, listings, prices = _parse_case(case)
+
+    if len(listings) > 60:
+        sweep_cash, sweep_actions = _best_sweep(
+            energy, capital, listings, prices
+        )
+        return sweep_actions if sweep_cash > capital else []
+
     groups = _build_groups(listings, prices)
     if not groups:
         return []
+
+    # Large challenge batches need a predictable response time.  The full
+    # beam is reserved for compact cases; multi-policy sweeps remain legal and
+    # exploit every quoted year on a round trip for large market matrices.
+    if len(groups) > 160:
+        sweep_cash, sweep_actions = _best_sweep(
+            energy, capital, listings, prices
+        )
+        return sweep_actions if sweep_cash > capital else []
 
     start = _State(
         cash=capital,
@@ -396,11 +701,17 @@ def solve_case(case: dict[str, Any]) -> list[str]:
             break
         frontier = _trim_frontier(next_states, listings, max_profit)
 
-    if best.cash <= capital:
-        return []
     actions = list(best.actions)
     if best.year != PRESENT_YEAR:
         actions.append(f"j-{best.year}-{PRESENT_YEAR}")
+
+    sweep_cash, sweep_actions = _best_sweep(
+        energy, capital, listings, prices
+    )
+    if sweep_cash > best.cash:
+        return sweep_actions
+    if best.cash <= capital:
+        return []
     return actions
 
 
