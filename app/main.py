@@ -8,6 +8,9 @@ from .phase2.adaptive.solution import PayloadValidationError, solve
 from .phase1.kanchiong_delivery_driver.solution import solve_case
 from .showdown import decide_move
 from .phase1.toolbox.server import mcp
+from .phase2.toolbox.server import register_tools as register_phase2_toolbox_tools
+
+register_phase2_toolbox_tools(mcp)
 
 mcp_app = mcp.http_app(path="/")
 
