@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from threading import RLock
 from typing import Iterable, Mapping
@@ -11,6 +12,18 @@ from .rules import (
     build_candidate_rules,
     extract_observations,
 )
+
+
+@dataclass(frozen=True)
+class RangeEvidence:
+    """One revealed opponent number, expressed in rule-relative strength."""
+
+    strength: float
+    action: str
+    size_bucket: str
+    position: str
+    round_name: str
+    reliability: float
 
 
 @dataclass(frozen=True)
@@ -26,6 +39,8 @@ class OpponentProfile:
     post_responses: int
     checked_to: int
     decisions: int
+    range_samples: tuple[RangeEvidence, ...] = ()
+    range_shown_hands: int = 0
 
     @property
     def tight_folder(self) -> bool:
@@ -48,6 +63,62 @@ class OpponentProfile:
     def passive(self) -> bool:
         return self.decisions >= 6 and self.aggression_rate < 0.28
 
+    def range_for(
+        self,
+        *,
+        payload: Mapping[str, object],
+        rule_knowledge: RuleKnowledge,
+    ) -> tuple[float, ...]:
+        """Estimate the opponent's 13-number range for the live action."""
+
+        uniform = (1 / 13,) * 13
+        context = _live_range_context(payload)
+        if (
+            context is None
+            or self.range_shown_hands < 6
+            or not self.range_samples
+            or rule_knowledge.observation_count == 0
+        ):
+            return uniform
+
+        current_action, size_bucket, position, round_name = context
+        contextual_samples: list[tuple[RangeEvidence, float]] = []
+        for sample in self.range_samples:
+            action_weight = _action_similarity(current_action, sample.action)
+            round_weight = 1.6 if sample.round_name == round_name else 0.55
+            position_weight = _context_similarity(position, sample.position)
+            size_weight = (
+                _context_similarity(size_bucket, sample.size_bucket)
+                if current_action in {"bet", "raise"}
+                else 1.0
+            )
+            weight = (
+                action_weight
+                * round_weight
+                * position_weight
+                * size_weight
+                * sample.reliability
+            )
+            if weight > 0:
+                contextual_samples.append((sample, weight))
+        if not contextual_samples:
+            return uniform
+
+        denominator = sum(weight for _, weight in contextual_samples)
+        likelihoods: list[float] = []
+        for number in range(1, 14):
+            strength = rule_knowledge.estimate(number, None).mean
+            similarity = sum(
+                weight
+                * math.exp(-0.5 * ((strength - sample.strength) / 0.18) ** 2)
+                for sample, weight in contextual_samples
+            ) / denominator
+            # The uniform component prevents a small behavioral sample from
+            # assigning zero probability to any legal private number.
+            likelihoods.append(0.20 + similarity)
+        total = sum(likelihoods)
+        return tuple(likelihood / total for likelihood in likelihoods)
+
 
 @dataclass
 class AttemptState:
@@ -66,6 +137,8 @@ class AttemptState:
     bets_after_check: int = 0
     decisions: int = 0
     aggressive_actions: int = 0
+    range_samples: list[RangeEvidence] = field(default_factory=list)
+    range_shown_hands: int = 0
 
     def __post_init__(self) -> None:
         self.match_ids.add(self.first_match_id)
@@ -75,6 +148,7 @@ class AttemptState:
         match_id: str,
         your_seat: object,
         hands: Iterable[Mapping[str, object]],
+        rule_knowledge: RuleKnowledge,
     ) -> None:
         self.match_ids.add(match_id)
         for hand in hands:
@@ -92,6 +166,9 @@ class AttemptState:
                 and action.get("action") in {"fold", "check", "call", "bet", "raise"}
             ]
             self._ingest_actions(decisions, your_seat)
+            self._ingest_range_evidence(
+                hand, decisions, your_seat, rule_knowledge
+            )
 
     def _ingest_actions(
         self, actions: list[Mapping[str, object]], your_seat: object
@@ -142,6 +219,63 @@ class AttemptState:
                 self.checked_to += 1
                 self.bets_after_check += response.get("action") == "bet"
 
+    def _ingest_range_evidence(
+        self,
+        hand: Mapping[str, object],
+        actions: list[Mapping[str, object]],
+        your_seat: object,
+        rule_knowledge: RuleKnowledge,
+    ) -> None:
+        shown = hand.get("shown_numbers")
+        community = _integer(hand.get("community_number"))
+        if not isinstance(shown, Mapping) or community is None:
+            return
+        if not 1 <= community <= 13:
+            return
+        opponent_seat = opponent_number = None
+        for seat, raw_number in shown.items():
+            number = _integer(raw_number)
+            if str(seat) != str(your_seat) and number is not None:
+                opponent_seat, opponent_number = seat, number
+                break
+        if opponent_number is None or not 1 <= opponent_number <= 13:
+            return
+
+        estimate = rule_knowledge.estimate(opponent_number, community)
+        reliability = max(
+            0.20,
+            min(
+                1.0,
+                estimate.coverage * (1.0 - estimate.disagreement)
+                + (0.20 if estimate.confidence == "learned" else 0.0),
+            ),
+        )
+        position = _position(
+            opponent_seat,
+            hand.get("button_seat"),
+        )
+        pot = max(1, _integer(hand.get("pot")) or 1)
+        added = False
+        for action in actions:
+            action_name = str(action.get("action", ""))
+            if (
+                str(action.get("seat")) != str(opponent_seat)
+                or action_name not in {"check", "call", "bet", "raise"}
+            ):
+                continue
+            self.range_samples.append(
+                RangeEvidence(
+                    strength=estimate.mean,
+                    action=action_name,
+                    size_bucket=_size_bucket(action, pot),
+                    position=position,
+                    round_name=str(action.get("round", "")),
+                    reliability=reliability,
+                )
+            )
+            added = True
+        self.range_shown_hands += added
+
     def profile(self) -> OpponentProfile:
         return OpponentProfile(
             fold_to_open_rate=_smoothed_rate(
@@ -163,6 +297,8 @@ class AttemptState:
             post_responses=self.post_responses,
             checked_to=self.checked_to,
             decisions=self.decisions,
+            range_samples=tuple(self.range_samples),
+            range_shown_hands=self.range_shown_hands,
         )
 
 
@@ -216,7 +352,7 @@ class Phase2State:
                 )
             ):
                 self._attempt = AttemptState(match_id, opponent_token)
-            self._attempt.ingest_hands(match_id, your_seat, hands)
+            self._attempt.ingest_hands(match_id, your_seat, hands, knowledge)
             return knowledge, self._attempt.profile()
 
     def ingest_completed_hands(
@@ -243,7 +379,9 @@ class Phase2State:
             ):
                 added += knowledge.ingest(observation)
             if self._attempt is not None:
-                self._attempt.ingest_hands(match_id, your_seat, materialized)
+                self._attempt.ingest_hands(
+                    match_id, your_seat, materialized, knowledge
+                )
             return added
 
     def knowledge(self, table_rule: str) -> RuleKnowledge:
@@ -275,6 +413,67 @@ def _next_other_action(
         if str(action.get("seat")) != str(your_seat):
             return action
     return None
+
+
+def _live_range_context(
+    payload: Mapping[str, object],
+) -> tuple[str, str, str, str] | None:
+    actions = payload.get("current_hand_actions")
+    if not isinstance(actions, list):
+        return None
+    your_seat = payload.get("your_seat")
+    round_name = str(payload.get("round", ""))
+    pot = max(1, _integer(payload.get("pot")) or 1)
+    for action in reversed(actions):
+        if not isinstance(action, Mapping):
+            continue
+        action_name = str(action.get("action", ""))
+        if (
+            str(action.get("seat")) == str(your_seat)
+            or action_name not in {"check", "call", "bet", "raise"}
+        ):
+            continue
+        return (
+            action_name,
+            _size_bucket(action, pot),
+            _position(action.get("seat"), payload.get("button_seat")),
+            str(action.get("round", round_name)),
+        )
+    return None
+
+
+def _action_similarity(current: str, observed: str) -> float:
+    if current == observed:
+        return 4.0
+    if current in {"bet", "raise"} and observed in {"bet", "raise"}:
+        return 1.5
+    return 0.25
+
+
+def _context_similarity(current: str, observed: str) -> float:
+    if "unknown" in {current, observed}:
+        return 1.0
+    return 1.4 if current == observed else 0.7
+
+
+def _position(seat: object, button_seat: object) -> str:
+    if seat is None or button_seat is None:
+        return "unknown"
+    return "button" if str(seat) == str(button_seat) else "blind"
+
+
+def _size_bucket(action: Mapping[str, object], pot: int) -> str:
+    if action.get("action") not in {"bet", "raise"}:
+        return "none"
+    amount = _integer(action.get("amount"))
+    if amount is None or amount <= 0:
+        return "unknown"
+    fraction = amount / max(1, pot)
+    if fraction <= 0.35:
+        return "small"
+    if fraction <= 0.80:
+        return "medium"
+    return "large"
 
 
 def _opponent_token(payload: Mapping[str, object]) -> str:

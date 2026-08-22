@@ -92,11 +92,32 @@ class StructuralScoringTests(unittest.TestCase):
             final_scores["multi_loop"] - final_scores["return"], 0.05
         )
 
-    def test_shortcut_is_stronger_than_plain_extension(self):
+    def test_shortcuts_are_stronger_than_plain_extension(self):
         extension = score_edges([("A", "B"), ("B", "C")])[-1]
-        shortcut = score_edges([("A", "B"), ("B", "C"), ("A", "C")])[-1]
+        short_shortcut = score_edges(
+            [("A", "B"), ("B", "C"), ("A", "C")], prefix="short-2"
+        )[-1]
+        long_path = [(f"N{index}", f"N{index + 1}") for index in range(7)]
+        long_shortcut = score_edges(
+            [*long_path, ("N0", "N7")], prefix="short-7"
+        )[-1]
 
-        self.assertGreater(shortcut, extension)
+        self.assertGreater(short_shortcut, extension)
+        self.assertGreater(long_shortcut, extension)
+        self.assertGreater(long_shortcut, short_shortcut)
+
+    def test_simple_fan_in_is_small_but_nonzero(self):
+        isolated = score_edges([("A", "C")], prefix="fan-isolated")[-1]
+        fan_in = score_edges(
+            [("A", "C"), ("B", "C")], prefix="fan-distinct"
+        )[-1]
+        extension = score_edges(
+            [("A", "B"), ("B", "C")], prefix="fan-extension"
+        )[-1]
+
+        self.assertEqual(isolated, 0.0)
+        self.assertGreater(fan_in, isolated)
+        self.assertLess(fan_in, extension)
 
     def test_repeated_edge_is_neutral_but_reverse_edge_is_a_return(self):
         engine = GhostChainsEngine()
@@ -184,6 +205,74 @@ class StructuralScoringTests(unittest.TestCase):
 
         self.assertLess(hub_extension, return_loop)
 
+    def test_bounded_return_loops_outrank_a_large_acyclic_hub(self):
+        hub = GhostChainsEngine()
+        for index in range(50):
+            hub.score_transaction(
+                transaction(
+                    f"wide-hub-{index}",
+                    f"payer-{index}",
+                    "merchant",
+                    when=BASE_TIME + timedelta(seconds=index),
+                )
+            )
+        hub_extension = hub.score_transaction(
+            transaction(
+                "wide-hub-out",
+                "merchant",
+                "supplier",
+                when=BASE_TIME + timedelta(minutes=1),
+            )
+        )
+
+        for cycle_length in range(2, 9):
+            path = [
+                (f"N{index}", f"N{index + 1}")
+                for index in range(cycle_length - 1)
+            ]
+            returning = score_edges(
+                [*path, (f"N{cycle_length - 1}", "N0")],
+                prefix=f"cycle-{cycle_length}",
+            )[-1]
+            with self.subTest(cycle_length=cycle_length):
+                self.assertGreater(returning, hub_extension)
+
+    def test_novelty_and_reinforcement_share_one_acyclic_cap(self):
+        branches = 5
+        acyclic_history = [
+            edge
+            for index in range(branches)
+            for edge in ((f"U{index}", "S"), (f"U{index}", "R"))
+        ]
+        acyclic_history.extend(("R", f"D{index}") for index in range(branches))
+        dense_acyclic = score_edges(
+            [*acyclic_history, ("S", "R")], prefix="acyclic-cap"
+        )[-1]
+        returning = score_edges(
+            [("A", "B"), ("B", "C"), ("C", "D"), ("D", "B")],
+            prefix="acyclic-cap-return",
+        )[-1]
+
+        self.assertLessEqual(dense_acyclic, 0.2)
+        self.assertGreater(returning, dense_acyclic)
+
+    def test_stronger_recurring_history_does_not_lower_candidate_risk(self):
+        history = [
+            ("0", "3"),
+            ("1", "0"),
+            ("2", "0"),
+            ("3", "0"),
+            ("3", "4"),
+            ("4", "2"),
+        ]
+        base = score_edges([*history, ("0", "1")], prefix="monotone-base")[-1]
+        reinforced = score_edges(
+            [*history, ("2", "1"), ("0", "1")],
+            prefix="monotone-reinforced",
+        )[-1]
+
+        self.assertGreater(reinforced, base)
+
     def test_amount_identity_and_unknown_fields_do_not_affect_phase_one(self):
         plain = GhostChainsEngine()
         enriched = GhostChainsEngine()
@@ -236,7 +325,7 @@ class StructuralScoringTests(unittest.TestCase):
 
 
 class TemporalStateTests(unittest.TestCase):
-    def test_exactly_twenty_four_hours_old_is_expired(self):
+    def test_twenty_four_hour_window_is_inclusive_at_the_boundary(self):
         inside = GhostChainsEngine()
         inside.score_transaction(transaction("inside-1", "A", "B"))
         inside_score = inside.score_transaction(
@@ -256,8 +345,34 @@ class TemporalStateTests(unittest.TestCase):
             )
         )
 
+        outside = GhostChainsEngine()
+        outside.score_transaction(transaction("outside-1", "A", "B"))
+        outside_score = outside.score_transaction(
+            transaction(
+                "outside-2",
+                "B",
+                "A",
+                when=BASE_TIME + timedelta(hours=24, microseconds=1),
+            )
+        )
+
         self.assertGreater(inside_score, 0.4)
-        self.assertEqual(boundary_score, 0.0)
+        self.assertGreater(boundary_score, 0.4)
+        self.assertEqual(outside_score, 0.0)
+
+    def test_timezone_offset_is_normalized_at_the_window_boundary(self):
+        engine = GhostChainsEngine()
+        first = transaction("offset-1", "A", "B")
+        first["createdAt"] = "2026-06-08T20:00:00+08:00"
+        engine.score_transaction(first)
+
+        boundary_score = engine.score_transaction(
+            transaction(
+                "offset-2", "B", "A", when=BASE_TIME + timedelta(hours=24)
+            )
+        )
+
+        self.assertGreater(boundary_score, 0.4)
 
     def test_out_of_order_transaction_inside_window_is_inserted(self):
         engine = GhostChainsEngine()
@@ -275,13 +390,62 @@ class TemporalStateTests(unittest.TestCase):
         self.assertGreater(late_return, 0.4)
         self.assertEqual(engine.snapshot().watermark, BASE_TIME + timedelta(hours=23))
 
-    def test_out_of_order_transaction_at_cutoff_is_neutral_and_not_inserted(self):
+    def test_unsorted_batch_matches_separate_arrival_order(self):
+        payloads = [
+            transaction(
+                "unordered-1", "X", "Y", when=BASE_TIME + timedelta(hours=23)
+            ),
+            transaction(
+                "unordered-2", "A", "B", when=BASE_TIME + timedelta(hours=1)
+            ),
+            transaction(
+                "unordered-3", "B", "A", when=BASE_TIME + timedelta(hours=2)
+            ),
+        ]
+        batched = GhostChainsEngine()
+        separate = GhostChainsEngine()
+
+        batch_scores = batched.score_batch(payloads)
+        separate_scores = [
+            separate.score_transaction(payload) for payload in payloads
+        ]
+
+        self.assertEqual(batch_scores, separate_scores)
+        self.assertEqual(batched.snapshot(), separate.snapshot())
+        self.assertGreater(batch_scores[-1], 0.4)
+
+    def test_reset_clears_a_high_watermark(self):
+        engine = GhostChainsEngine()
+        engine.score_transaction(
+            transaction(
+                "future", "X", "Y", when=BASE_TIME + timedelta(days=30)
+            )
+        )
+
+        engine.reset()
+        engine.score_transaction(transaction("old-1", "A", "B"))
+        return_score = engine.score_transaction(
+            transaction(
+                "old-2", "B", "A", when=BASE_TIME + timedelta(minutes=1)
+            )
+        )
+
+        self.assertGreater(return_score, 0.4)
+        self.assertEqual(
+            engine.snapshot().watermark, BASE_TIME + timedelta(minutes=1)
+        )
+
+    def test_out_of_order_transaction_just_before_cutoff_is_not_inserted(self):
         engine = GhostChainsEngine()
         engine.score_transaction(
             transaction("watermark", "X", "Y", when=BASE_TIME + timedelta(hours=24))
         )
 
-        stale = engine.score_transaction(transaction("stale", "A", "B"))
+        stale = engine.score_transaction(
+            transaction(
+                "stale", "A", "B", when=BASE_TIME - timedelta(microseconds=1)
+            )
+        )
         would_be_return = engine.score_transaction(
             transaction(
                 "later", "B", "A", when=BASE_TIME + timedelta(hours=23)
@@ -291,6 +455,23 @@ class TemporalStateTests(unittest.TestCase):
         self.assertEqual(stale, 0.0)
         self.assertEqual(would_be_return, 0.0)
         self.assertNotIn(("A", "B", 1), engine.snapshot().active_edges)
+
+    def test_out_of_order_transaction_at_cutoff_is_inserted(self):
+        engine = GhostChainsEngine()
+        engine.score_transaction(
+            transaction("watermark", "X", "Y", when=BASE_TIME + timedelta(hours=24))
+        )
+
+        boundary = engine.score_transaction(transaction("boundary", "A", "B"))
+        returning = engine.score_transaction(
+            transaction(
+                "return", "B", "A", when=BASE_TIME + timedelta(hours=23)
+            )
+        )
+
+        self.assertEqual(boundary, 0.0)
+        self.assertGreater(returning, 0.4)
+        self.assertIn(("A", "B", 1), engine.snapshot().active_edges)
 
     def test_parallel_edge_reference_count_survives_first_expiry(self):
         engine = GhostChainsEngine()
@@ -302,12 +483,22 @@ class TemporalStateTests(unittest.TestCase):
         )
 
         engine.score_transaction(
-            transaction("tick-1", "X", "Y", when=BASE_TIME + timedelta(hours=24))
+            transaction(
+                "tick-1",
+                "X",
+                "Y",
+                when=BASE_TIME + timedelta(hours=24, microseconds=1),
+            )
         )
         self.assertIn(("A", "B", 1), engine.snapshot().active_edges)
 
         engine.score_transaction(
-            transaction("tick-2", "Y", "Z", when=BASE_TIME + timedelta(hours=36))
+            transaction(
+                "tick-2",
+                "Y",
+                "Z",
+                when=BASE_TIME + timedelta(hours=36, microseconds=1),
+            )
         )
         self.assertNotIn(("A", "B", 1), engine.snapshot().active_edges)
 
@@ -327,7 +518,12 @@ class TemporalStateTests(unittest.TestCase):
             transaction("e-2", "B", "C", when=BASE_TIME + timedelta(hours=1))
         )
         expired_return = expired.score_transaction(
-            transaction("e-3", "C", "A", when=BASE_TIME + timedelta(hours=24))
+            transaction(
+                "e-3",
+                "C",
+                "A",
+                when=BASE_TIME + timedelta(hours=24, microseconds=1),
+            )
         )
 
         self.assertGreater(active_return, expired_return)
@@ -374,7 +570,14 @@ class IdempotencyAndBatchTests(unittest.TestCase):
         before_conflict = engine.snapshot()
 
         with self.assertRaises(TransactionConflictError):
-            engine.score_transaction(transaction("same-id", "A", "C"))
+            engine.score_transaction(
+                transaction(
+                    "same-id",
+                    "A",
+                    "C",
+                    when=BASE_TIME + timedelta(days=365),
+                )
+            )
 
         self.assertEqual(engine.snapshot(), before_conflict)
 

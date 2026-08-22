@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from .phase2.adaptive.solution import PayloadValidationError, solve
 from .phase1.kanchiong_delivery_driver.solution import solve_case
-from .phase1.ghost_chains import (
+from .phase2.ghost_chains import (
     Transaction,
     TransactionConflictError,
     TransactionValidationError,

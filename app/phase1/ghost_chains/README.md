@@ -11,17 +11,19 @@ edge, the scorer measures its marginal increase in bounded discounted walks:
 
 `K = A + alpha*A^2 + ... + alpha^(L-1)*A^L`
 
-Pair capacity rewards path multiplicity, and diagonal entries (closed money
-routes) carry extra weight. The ordinary value of a single direct edge is
-subtracted, so a disconnected transfer scores zero. Scores then saturate into
-`[0, 1]`. The aggregate open-path contribution also saturates before closed
-routes are added, preventing large merchant or payroll stars from outweighing
-actual return loops. Phase 1 deliberately ignores amount, IP, and device
-values.
+Pair capacity rewards path multiplicity, shortest-path efficiency rewards
+genuine shortcuts, and diagonal entries (closed money routes) carry extra
+weight. A small saturated destination-reuse potential recognizes distinct
+senders converging on one entity without turning merchant or payroll fan-in
+into the main signal. The ordinary value of a single direct edge is subtracted,
+so a disconnected transfer scores zero. Scores then saturate into `[0, 1]`.
+All non-closed evidence shares one cap, preventing novelty and reinforcement
+from stacking until a large acyclic bridge outweighs a return loop. Phase 1
+deliberately ignores amount, IP, and device values.
 
 The engine also provides:
 
-- a watermark-defined active window `(M - 24h, M]`;
+- a watermark-defined active window `[M - 24h, M]`;
 - out-of-order processing without watermark rollback;
 - reference-counted parallel graph edges;
 - exact retry scores and conflicting-ID detection;

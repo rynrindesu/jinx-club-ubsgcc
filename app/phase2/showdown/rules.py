@@ -8,6 +8,7 @@ rule is outside the model library.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from statistics import fmean
 from typing import Iterable, Mapping, Sequence
@@ -156,16 +157,27 @@ class RuleKnowledge:
         self._agreement_cache_key = None
         return True
 
-    def estimate(self, your_number: int, community: int | None) -> EquityEstimate:
+    def estimate(
+        self,
+        your_number: int,
+        community: int | None,
+        opponent_range: Sequence[float] | None = None,
+    ) -> EquityEstimate:
         if not 1 <= your_number <= 13:
             raise ValueError("your_number must be between 1 and 13")
         if community is not None and not 1 <= community <= 13:
             raise ValueError("community must be between 1 and 13")
 
+        normalized_range = _normalized_opponent_range(opponent_range)
         agreement = self._candidate_agreement()
         if self.active_candidates:
             equities = [
-                _candidate_equity(self.candidates[index], your_number, community)
+                _candidate_equity(
+                    self.candidates[index],
+                    your_number,
+                    community,
+                    normalized_range,
+                )
                 for index in sorted(self.active_candidates)
             ]
             lower = min(equities)
@@ -173,7 +185,7 @@ class RuleKnowledge:
             coverage = agreement
         else:
             mean, lower, upper, coverage = self._fallback_equity(
-                your_number, community
+                your_number, community, normalized_range
             )
             equities = [mean]
 
@@ -242,23 +254,27 @@ class RuleKnowledge:
         return agreement
 
     def _fallback_equity(
-        self, your_number: int, community: int | None
+        self,
+        your_number: int,
+        community: int | None,
+        opponent_range: tuple[float, ...],
     ) -> tuple[float, float, float, float]:
         communities = range(1, 14) if community is None else (community,)
         earned = guaranteed = possible = known = total = 0.0
         for shared in communities:
             for opponent in range(1, 14):
-                total += 1
+                weight = opponent_range[opponent - 1]
+                total += weight
                 outcome = self._inferred_result(shared, your_number, opponent)
                 if outcome is None:
-                    earned += 0.5
-                    possible += 1.0
+                    earned += 0.5 * weight
+                    possible += weight
                     continue
-                known += 1
+                known += weight
                 share = _pot_share(outcome)
-                earned += share
-                guaranteed += share
-                possible += share
+                earned += share * weight
+                guaranteed += share * weight
+                possible += share * weight
         return (
             earned / total,
             guaranteed / total,
@@ -493,15 +509,41 @@ def _candidate_key(
 
 
 def _candidate_equity(
-    candidate: RuleCandidate, your_number: int, community: int | None
+    candidate: RuleCandidate,
+    your_number: int,
+    community: int | None,
+    opponent_range: tuple[float, ...],
 ) -> float:
     communities = range(1, 14) if community is None else (community,)
     shares = [
         _pot_share(candidate.compare(your_number, opponent, shared))
+        * opponent_range[opponent - 1]
         for shared in communities
         for opponent in range(1, 14)
     ]
-    return fmean(shares)
+    return sum(shares) / len(communities)
+
+
+def _normalized_opponent_range(
+    opponent_range: Sequence[float] | None,
+) -> tuple[float, ...]:
+    """Return a safe 13-number distribution, defaulting to uniform."""
+
+    uniform = (1 / 13,) * 13
+    if opponent_range is None or isinstance(opponent_range, (str, bytes)):
+        return uniform
+    if len(opponent_range) != 13:
+        return uniform
+    try:
+        weights = tuple(float(weight) for weight in opponent_range)
+    except (TypeError, ValueError, OverflowError):
+        return uniform
+    if any(not math.isfinite(weight) or weight < 0 for weight in weights):
+        return uniform
+    total = sum(weights)
+    if total <= 0:
+        return uniform
+    return tuple(weight / total for weight in weights)
 
 
 def _pot_share(outcome: Outcome) -> float:

@@ -15,11 +15,14 @@ Adjacency = Mapping[str, AbstractSet[str]]
 class ScoreConfig:
     """Centralized, deterministic structural-scoring parameters."""
 
-    max_walk_length: int = 7
+    max_walk_length: int = 8
     walk_discount: float = 0.45
     convergence_weight: float = 2.0
     convergence_scale: float = 4.0
-    open_route_capacity: float = 4.0
+    open_route_capacity: float = 2.0
+    shortest_path_weight: float = 4.0
+    fan_in_capacity: float = 0.5
+    fan_in_scale: float = 1.0
     closed_route_weight: float = 6.0
     risk_half_saturation: float = 8.0
     self_transfer_risk: float = 0.12
@@ -33,6 +36,9 @@ class ScoreConfig:
             "convergence_weight",
             "convergence_scale",
             "open_route_capacity",
+            "shortest_path_weight",
+            "fan_in_capacity",
+            "fan_in_scale",
             "closed_route_weight",
             "risk_half_saturation",
         ):
@@ -88,34 +94,65 @@ class DiscountedWalkScorer:
             )
 
         affected_sources = self._reverse_neighborhood(sender, reverse)
-        open_deltas: list[float] = []
+        novel_route_deltas: list[float] = []
+        reinforcement_deltas: list[float] = []
         closed_deltas: list[float] = []
+        shortest_path_deltas: list[float] = []
         extra_edge = (sender, recipient)
+        direct_edge_baseline = self._pair_value(1.0)
 
         for source in sorted(affected_sources):
             before = self._connectivity(source, forward)
             after = self._connectivity(source, forward, extra_edge=extra_edge)
+            before_distances = self._shortest_distances(source, forward)
+            after_distances = self._shortest_distances(
+                source, forward, extra_edge=extra_edge
+            )
             for target in sorted(after.keys() | before.keys()):
                 delta = self._pair_value(after.get(target, 0.0)) - self._pair_value(
                     before.get(target, 0.0)
                 )
+                if source == sender and target == recipient:
+                    delta -= direct_edge_baseline
                 if delta <= 0:
                     continue
                 if source == target:
                     closed_deltas.append(delta)
+                elif before.get(target, 0.0) > 0:
+                    reinforcement_deltas.append(delta)
                 else:
-                    open_deltas.append(delta)
+                    novel_route_deltas.append(delta)
 
-        open_delta = math.fsum(open_deltas)
+            for target, after_distance in after_distances.items():
+                before_distance = before_distances.get(target)
+                if (
+                    target == source
+                    or before_distance is None
+                    or after_distance >= before_distance
+                ):
+                    continue
+                shortest_path_deltas.append(
+                    (1.0 / after_distance) - (1.0 / before_distance)
+                )
+
+        novel_route_delta = math.fsum(novel_route_deltas)
+        reinforcement_delta = math.fsum(reinforcement_deltas)
+        shortest_path_delta = math.fsum(shortest_path_deltas)
         closed_delta = math.fsum(closed_deltas)
-        direct_edge_baseline = self._pair_value(1.0)
-        open_route_delta = max(0.0, open_delta - direct_edge_baseline)
-        bounded_open_delta = self.config.open_route_capacity * math.tanh(
-            open_route_delta / self.config.open_route_capacity
+        fan_in_delta = self._fan_in_delta(recipient, reverse)
+        non_closed_delta = (
+            novel_route_delta
+            + reinforcement_delta
+            + self.config.shortest_path_weight * shortest_path_delta
+            + fan_in_delta
+        )
+        bounded_non_closed_delta = (
+            self.config.open_route_capacity
+            * math.tanh(non_closed_delta / self.config.open_route_capacity)
         )
         raw = max(
             0.0,
-            bounded_open_delta + self.config.closed_route_weight * closed_delta,
+            bounded_non_closed_delta + self.config.closed_route_weight * closed_delta,
         )
         if not math.isfinite(raw):
             risk = 1.0
@@ -127,9 +164,24 @@ class DiscountedWalkScorer:
         return StructuralScore(
             risk=min(1.0, max(0.0, risk)),
             raw=raw,
-            open_route_delta=open_route_delta,
+            open_route_delta=non_closed_delta,
             closed_route_delta=closed_delta,
         )
+
+    def _fan_in_delta(self, recipient: str, reverse: Adjacency) -> float:
+        """Return a small saturated marginal for a reused destination."""
+
+        before_degree = len(reverse.get(recipient, ()))
+        if before_degree == 0:
+            return 0.0
+        config = self.config
+        before = config.fan_in_capacity * math.tanh(
+            (before_degree - 1) / config.fan_in_scale
+        )
+        after = config.fan_in_capacity * math.tanh(
+            before_degree / config.fan_in_scale
+        )
+        return after - before
 
     def _pair_value(self, connectivity: float) -> float:
         """Reward path multiplicity, becoming linear for very dense pairs."""
@@ -165,6 +217,33 @@ class DiscountedWalkScorer:
             visited.update(next_frontier)
             frontier = next_frontier
         return visited
+
+    def _shortest_distances(
+        self,
+        source: str,
+        forward: Adjacency,
+        *,
+        extra_edge: tuple[str, str] | None = None,
+    ) -> dict[str, int]:
+        """Return bounded directed shortest-path lengths from one source."""
+
+        distances = {source: 0}
+        frontier = {source}
+        for distance in range(1, self.config.max_walk_length + 1):
+            next_frontier: set[str] = set()
+            for node in frontier:
+                neighbors = set(forward.get(node, ()))
+                if extra_edge is not None and node == extra_edge[0]:
+                    neighbors.add(extra_edge[1])
+                next_frontier.update(
+                    neighbor for neighbor in neighbors if neighbor not in distances
+                )
+            if not next_frontier:
+                break
+            for node in next_frontier:
+                distances[node] = distance
+            frontier = next_frontier
+        return distances
 
     def _connectivity(
         self,

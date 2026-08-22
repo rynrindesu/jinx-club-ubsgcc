@@ -257,7 +257,7 @@ class GhostChainsEngine:
         if self._watermark is None:
             return
         cutoff = self._watermark - self.window
-        while self._expiry_heap and self._expiry_heap[0][0] <= cutoff:
+        while self._expiry_heap and self._expiry_heap[0][0] < cutoff:
             _, sequence, tx_id = heapq.heappop(self._expiry_heap)
             active = self._active.get(tx_id)
             if active is None or active.sequence != sequence:
@@ -282,7 +282,7 @@ class GhostChainsEngine:
     def _is_outside_window(self, created_at: datetime) -> bool:
         if self._watermark is None:
             return False
-        return created_at <= self._watermark - self.window
+        return created_at < self._watermark - self.window
 
 
 _default_engine = GhostChainsEngine()
