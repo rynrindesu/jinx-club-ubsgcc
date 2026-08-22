@@ -5,7 +5,7 @@ One FastAPI deployment hosts handlers for multiple coding challenges.
 ## Routes
 
 - `POST /solve` — retained mock adaptive-API challenge.
-- `POST /move` — SHOWDOWN, implemented in `phase01/showdown/`.
+- `POST /move` — SHOWDOWN, implemented in `app/phase1/showdown/`.
 - `GET /health` — warm-up and deployment health check.
 
 ## Run locally

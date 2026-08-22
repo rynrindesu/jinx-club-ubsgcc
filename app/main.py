@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from .phase1.adaptive_api_1 import solve
-from phase01.showdown import decide_move
+from .phase1.showdown import decide_move
 
 app = FastAPI(title="Jinx Club Challenge Gateway")
 
