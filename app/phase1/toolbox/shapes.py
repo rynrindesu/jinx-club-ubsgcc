@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 from collections import Counter
 from io import BytesIO
-from math import hypot
+from math import inf, hypot
 
 from PIL import Image, UnidentifiedImageError
 
@@ -13,9 +13,11 @@ from PIL import Image, UnidentifiedImageError
 def classify_shape_image(image_base64: str) -> str:
     """Classify a filled PNG as a rectangle, triangle, or circle.
 
-    The challenge images contain one high-contrast shape on a uniform or
-    transparent background.  Comparing the foreground area to its bounding
-    box distinguishes the three possible filled shapes without an ML model.
+    The challenge images contain one high-contrast, filled shape on a uniform
+    or transparent background.  The foreground's area relative to its minimum
+    *oriented* bounding rectangle separates the three possible shapes without
+    an ML model: a rectangle fills the box, a circle fills pi / 4 of it, and a
+    triangle fills one half of it.
     """
 
     image = _decode_png(image_base64).convert("RGBA")
@@ -26,20 +28,28 @@ def classify_shape_image(image_base64: str) -> str:
     ]
 
     width, height = image.size
-    occupied = [
+    occupied = {
         (index % width, index // width)
         for index, present in enumerate(foreground)
         if present
-    ]
+    }
     if not occupied:
         raise ValueError("image does not contain a visible shape")
 
-    corners = _simplify_hull(_convex_hull(occupied))
-    edge_count = len(corners)
-    if edge_count == 3:
-        return "triangle"
-    if edge_count == 4:
+    # Ignore isolated foreground specks and retain the supplied image's one
+    # visible shape. Eight-way connectivity keeps anti-aliased diagonal edges
+    # in the same component.
+    shape = _largest_component(occupied)
+    hull = _convex_hull(shape)
+    box_area = _minimum_oriented_bounding_box_area(hull)
+    if box_area == 0:
+        raise ValueError("image does not contain a two-dimensional shape")
+
+    rectangularity = len(shape) / box_area
+    if rectangularity >= 0.90:
         return "rectangle"
+    if rectangularity <= 0.63:
+        return "triangle"
     return "circle"
 
 
@@ -114,81 +124,58 @@ def _convex_hull(points: list[tuple[int, int]]) -> list[tuple[int, int]]:
     return lower[:-1] + upper[:-1]
 
 
-def _simplify_hull(hull: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    """Approximate a rasterized hull with its meaningful straight sides."""
+def _largest_component(points: set[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Return the largest eight-connected foreground component."""
 
-    if len(hull) <= 4:
-        return hull
+    remaining = set(points)
+    largest: list[tuple[int, int]] = []
 
-    start_index = min(range(len(hull)), key=lambda index: hull[index])
-    start = hull[start_index]
-    end_index = max(
-        range(len(hull)),
-        key=lambda index: _squared_distance(start, hull[index]),
-    )
-    end = hull[end_index]
+    while remaining:
+        start = remaining.pop()
+        component = [start]
+        pending = [start]
+        while pending:
+            x, y = pending.pop()
+            for x_offset in (-1, 0, 1):
+                for y_offset in (-1, 0, 1):
+                    if x_offset == y_offset == 0:
+                        continue
+                    neighbour = (x + x_offset, y + y_offset)
+                    if neighbour in remaining:
+                        remaining.remove(neighbour)
+                        component.append(neighbour)
+                        pending.append(neighbour)
 
-    first_arc = _cyclic_slice(hull, start_index, end_index)
-    second_arc = _cyclic_slice(hull, end_index, start_index)
-    width = max(point[0] for point in hull) - min(point[0] for point in hull)
-    height = max(point[1] for point in hull) - min(point[1] for point in hull)
-    # A four-percent tolerance absorbs the paired corners introduced by a
-    # thick anti-aliased outline while retaining the visibly distinct sides
-    # of a triangle or rectangle.
-    tolerance = max(width, height) * 0.04
+        if len(component) > len(largest):
+            largest = component
 
-    # Each arc includes both endpoints.  Dropping the duplicated final point
-    # from each produces one closed polygon with unique vertices.
-    return _simplify_path(first_arc, tolerance)[:-1] + _simplify_path(second_arc, tolerance)[:-1]
-
-
-def _cyclic_slice(
-    points: list[tuple[int, int]],
-    start_index: int,
-    end_index: int,
-) -> list[tuple[int, int]]:
-    if start_index <= end_index:
-        return points[start_index : end_index + 1]
-    return points[start_index:] + points[: end_index + 1]
+    return largest
 
 
-def _simplify_path(
-    points: list[tuple[int, int]],
-    tolerance: float,
-) -> list[tuple[int, int]]:
-    if len(points) <= 2:
-        return points
+def _minimum_oriented_bounding_box_area(hull: list[tuple[int, int]]) -> float:
+    """Return the area of the smallest rectangle enclosing ``hull``.
 
-    start, end = points[0], points[-1]
-    index, distance = max(
-        (
-            (index, _distance_to_line(point, start, end))
-            for index, point in enumerate(points[1:-1], start=1)
-        ),
-        key=lambda item: item[1],
-    )
-    if distance <= tolerance:
-        return [start, end]
+    One side of a minimum-area bounding rectangle is collinear with a convex
+    hull edge.  Testing every hull-edge orientation therefore finds the
+    rectangle without requiring an additional imaging dependency.
+    """
 
-    return (
-        _simplify_path(points[: index + 1], tolerance)[:-1]
-        + _simplify_path(points[index:], tolerance)
-    )
+    if len(hull) < 3:
+        return 0
 
+    smallest_area = inf
+    for index, start in enumerate(hull):
+        end = hull[(index + 1) % len(hull)]
+        edge_length = hypot(end[0] - start[0], end[1] - start[1])
+        if edge_length == 0:
+            continue
 
-def _distance_to_line(
-    point: tuple[int, int],
-    start: tuple[int, int],
-    end: tuple[int, int],
-) -> float:
-    line_length = hypot(end[0] - start[0], end[1] - start[1])
-    if line_length == 0:
-        return hypot(point[0] - start[0], point[1] - start[1])
-    return abs(
-        (end[0] - start[0]) * (start[1] - point[1])
-        - (start[0] - point[0]) * (end[1] - start[1])
-    ) / line_length
+        along_x = (end[0] - start[0]) / edge_length
+        along_y = (end[1] - start[1]) / edge_length
+        across_x, across_y = -along_y, along_x
+        along = [point[0] * along_x + point[1] * along_y for point in hull]
+        across = [point[0] * across_x + point[1] * across_y for point in hull]
+        area = (max(along) - min(along)) * (max(across) - min(across))
+        smallest_area = min(smallest_area, area)
 
-
-def _squared_distance(first: tuple[int, int], second: tuple[int, int]) -> int:
-    return (second[0] - first[0]) ** 2 + (second[1] - first[1]) ** 2
+    return smallest_area
