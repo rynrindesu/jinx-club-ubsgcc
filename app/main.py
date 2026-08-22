@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from .phase1.adaptive_api_1 import solve
+from .phase1.adaptive_api_gateway_1.solution import solve
 
 app = FastAPI()
 
