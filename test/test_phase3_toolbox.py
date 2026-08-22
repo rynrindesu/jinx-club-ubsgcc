@@ -49,6 +49,18 @@ class InboxEndpointTests(unittest.TestCase):
     def test_uses_the_emails_endpoint_by_default(self):
         self.assertTrue(toolbox_server._inbox_url().endswith("/emails"))
 
+    def test_extracts_each_email_body_from_the_emails_payload(self):
+        inbox = toolbox_server._inbox_text(
+            {
+                "emails": [
+                    {"id": "e001", "body": "Response: ACCEPTED\nWhen: Tuesday 10:00-11:00"},
+                    {"id": "e002", "body": "Response: TENTATIVE\nWhen: Tuesday 13:00-14:00"},
+                ]
+            }
+        )
+        self.assertIn("Response: ACCEPTED", inbox)
+        self.assertIn("Response: TENTATIVE", inbox)
+
 
 class MeetingTimeTests(unittest.TestCase):
     inbox = """From: Marek Sould <m.sould@kesterline.example>

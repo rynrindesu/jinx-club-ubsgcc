@@ -107,11 +107,26 @@ def _fetch_inbox() -> str:
         payload = response.json()
     except ValueError:
         return response.text
+    return _inbox_text(payload)
+
+
+def _inbox_text(payload: Any) -> str:
+    """Extract mail bodies from the challenge's ``{\"emails\": [...]}`` payload."""
+
     if isinstance(payload, str):
         return payload
     if isinstance(payload, dict) and isinstance(payload.get("inbox"), str):
         return payload["inbox"]
-    raise ValueError("inbox response must be text or an object with an inbox field")
+    if isinstance(payload, dict) and isinstance(payload.get("emails"), list):
+        bodies = []
+        for email in payload["emails"]:
+            if not isinstance(email, dict) or not isinstance(email.get("body"), str):
+                raise ValueError("each email must be an object with a text body")
+            bodies.append(email["body"])
+        return "\n\n".join(bodies)
+    raise ValueError(
+        "inbox response must be text, an object with an inbox field, or an emails array"
+    )
 
 
 def _fetch_schedule(person: str, day: str) -> dict[str, Any]:
