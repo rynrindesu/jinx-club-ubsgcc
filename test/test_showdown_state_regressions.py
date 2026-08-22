@@ -45,6 +45,7 @@ def empty_profile(**overrides: object) -> OpponentProfile:
         "post_responses": 0,
         "checked_to": 0,
         "decisions": 0,
+        "post_reraises": 0,
     }
     values.update(overrides)
     return OpponentProfile(**values)  # type: ignore[arg-type]
@@ -154,6 +155,28 @@ class OpponentRangeRegressionTests(unittest.TestCase):
 
         self.assertLess(profile.reraise_rate, 0.30)
         self.assertTrue(profile.punishes_opens)
+
+    def test_post_reraise_count_is_sticky_after_rate_dilution(self):
+        profile = empty_profile(
+            post_responses=10,
+            post_reraise_rate=(1 + 0.15 * 4) / (10 + 4),
+            post_reraises=1,
+        )
+
+        self.assertLess(profile.post_reraise_rate, 0.29)
+        self.assertTrue(profile.punishes_post_bets)
+        self.assertFalse(
+            empty_profile(
+                post_responses=10,
+                post_reraise_rate=profile.post_reraise_rate,
+            ).punishes_post_bets
+        )
+        self.assertTrue(
+            empty_profile(
+                post_responses=1,
+                post_reraise_rate=0.30,
+            ).punishes_post_bets
+        )
 
 
 class ActionSizingRegressionTests(unittest.TestCase):

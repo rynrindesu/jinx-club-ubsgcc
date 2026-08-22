@@ -43,6 +43,7 @@ def neutral_profile() -> OpponentProfile:
         post_responses=0,
         checked_to=0,
         decisions=0,
+        post_reraises=0,
     )
 
 
@@ -558,6 +559,87 @@ class Phase2PolicyRegressionTests(unittest.TestCase):
                 _risk_context(raise_war),
             ),
             {"action": "fold"},
+        )
+
+    def test_sticky_post_reraise_checks_replay_trap_but_keeps_top_value(self):
+        request = phase2_request(
+            3,
+            table_rule="replay-leg-four",
+            leg_number=4,
+            hand_number=4,
+            delta=5,
+        )
+        request.update(
+            round="post_reveal",
+            community_number=13,
+            button_seat=1,
+            your_stack=200,
+            pot=10,
+            to_call=0,
+            min_raise_to=2,
+            max_raise_to=200,
+            legal_actions=["check", "bet"],
+            current_hand_actions=[
+                {
+                    "round": "pre_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 5,
+                },
+                {
+                    "round": "pre_reveal",
+                    "seat": 0,
+                    "action": "call",
+                    "amount": 5,
+                },
+            ],
+        )
+        request["players"][0].update(
+            chip_delta=5,
+            stack=200,
+            bet_this_round=0,
+        )
+        request["players"][1].update(
+            chip_delta=-5,
+            stack=190,
+            bet_this_round=0,
+        )
+        profile = replace(
+            neutral_profile(),
+            fold_to_open_rate=0.188888889,
+            post_fold_rate=0.352380952,
+            post_reraise_rate=0.171428571,
+            bet_after_check_rate=0.458823529,
+            aggression_rate=0.283720930,
+            open_responses=14,
+            post_responses=17,
+            checked_to=13,
+            decisions=168,
+            post_reraises=1,
+        )
+        risk = _risk_context(request)
+
+        self.assertEqual(risk.tier, "normal")
+        self.assertTrue(profile.calling_station)
+        self.assertLess(profile.post_reraise_rate, 0.29)
+        self.assertTrue(profile.punishes_post_bets)
+        self.assertEqual(
+            _post_reveal_move(
+                request,
+                learned_equity(0.766973192),
+                profile,
+                risk,
+            ),
+            {"action": "check"},
+        )
+        self.assertEqual(
+            _post_reveal_move(
+                request,
+                learned_equity(0.80),
+                profile,
+                risk,
+            ),
+            {"action": "bet", "amount": 6},
         )
 
     def test_replay_closing_all_ins_are_called_after_value_wager(self):

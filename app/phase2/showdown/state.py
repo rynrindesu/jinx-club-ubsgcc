@@ -44,6 +44,7 @@ class OpponentProfile:
     range_samples: tuple[RangeEvidence, ...] = ()
     range_shown_hands: int = 0
     open_reraises: int = 0
+    post_reraises: int = 0
 
     @property
     def tight_folder(self) -> bool:
@@ -83,7 +84,13 @@ class OpponentProfile:
     def punishes_post_bets(self) -> bool:
         """Return whether a value bet has already drawn a re-raise."""
 
-        return self.post_responses >= 1 and self.post_reraise_rate > 0.29
+        # As with punished opens, one demonstrated trap is more informative
+        # than the smoothed rate after later calls dilute it.  Opponent state
+        # lasts for exactly one four-leg attempt, so keep the warning sticky
+        # for that same lifetime.
+        return self.post_reraises > 0 or (
+            self.post_responses >= 1 and self.post_reraise_rate > 0.29
+        )
 
     def range_for(
         self,
@@ -360,6 +367,7 @@ class AttemptState:
             range_samples=tuple(self.range_samples),
             range_shown_hands=self.range_shown_hands,
             open_reraises=self.open_reraises,
+            post_reraises=self.post_reraises,
         )
 
 

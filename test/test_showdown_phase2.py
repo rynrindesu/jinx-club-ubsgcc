@@ -975,10 +975,31 @@ class Phase2PolicyTests(unittest.TestCase):
                 {"round": "post_reveal", "seat": 0, "action": "fold"},
             ],
         )
+        later_call = completed_hand(
+            2,
+            4,
+            8,
+            10,
+            1,
+            actions=[
+                {
+                    "round": "post_reveal",
+                    "seat": 0,
+                    "action": "bet",
+                    "amount": 5,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "call",
+                    "amount": 5,
+                },
+            ],
+        )
         request = phase2_request(
             4,
             table_rule="post-reraise-rule",
-            hand_number=2,
+            hand_number=3,
         )
         request.update(
             round="post_reveal",
@@ -992,12 +1013,16 @@ class Phase2PolicyTests(unittest.TestCase):
             current_hand_actions=[
                 {"round": "post_reveal", "seat": 1, "action": "check"}
             ],
-            recent_hands=[punished_bet],
+            recent_hands=[punished_bet, later_call],
         )
         request["players"][0].update(stack=198, bet_this_round=0)
         request["players"][1].update(bet_this_round=0)
         engine = Phase2Engine(state)
 
+        _knowledge, profile = state.observe_payload(request)
+        self.assertLess(profile.post_reraise_rate, 0.29)
+        self.assertEqual(profile.post_reraises, 1)
+        self.assertTrue(profile.punishes_post_bets)
         self.assertEqual(engine.decide(request), {"action": "check"})
 
         strongest = copy.deepcopy(request)
