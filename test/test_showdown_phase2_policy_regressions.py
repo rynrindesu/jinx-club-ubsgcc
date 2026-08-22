@@ -322,11 +322,25 @@ class Phase2PolicyRegressionTests(unittest.TestCase):
         request["players"][0].update(stack=179, bet_this_round=16)
         request["players"][1].update(bet_this_round=50)
 
+        state = Phase2State()
+        knowledge, profile = state.observe_payload(request)
+        estimate = knowledge.estimate(
+            11,
+            11,
+            opponent_range=profile.range_for(
+                payload=request,
+                rule_knowledge=knowledge,
+            ),
+        )
+        self.assertEqual(estimate.confidence, "learned")
+        self.assertTrue(estimate.cannot_lose)
+        self.assertAlmostEqual(estimate.mean, 0.9030913902399875)
+
         self.assertEqual(
             _post_reveal_move(
                 request,
-                learned_equity(0.9030913902399875),
-                neutral_profile(),
+                estimate,
+                profile,
                 _risk_context(request),
             ),
             {"action": "call"},
