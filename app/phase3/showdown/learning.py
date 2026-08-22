@@ -178,6 +178,145 @@ def position_bucket(
     return "late"
 
 
+@dataclass(frozen=True, slots=True)
+class ContributionAudit:
+    """Result of reconstructing one completed hand's round-total wagers.
+
+    The replay protocol records sized actions as totals for their betting
+    round, while calls commonly omit an amount. Keeping the reconstruction in
+    a small public value object makes side-pot rejection independently
+    testable without coupling it to rule or opponent models.
+    """
+
+    totals: tuple[tuple[int, int], ...]
+    shown_totals: tuple[tuple[int, int], ...]
+    reconstructed_pot: int
+    declared_pot: int
+    complete: bool
+    unequal_shown_contributions: bool
+    pot_mismatch: bool
+
+    @property
+    def ambiguous(self) -> bool:
+        """Whether contribution evidence makes the showdown unsafe for rules."""
+
+        return self.unequal_shown_contributions or self.pot_mismatch
+
+
+def audit_showdown_contributions(
+    hand: RecentHand,
+    active_seats: Iterable[int] = (),
+    *,
+    small_blind: int = 1,
+    big_blind: int = 2,
+) -> ContributionAudit:
+    """Reconstruct contributions and identify provably ambiguous showdowns.
+
+    A showdown is contribution-ambiguous when its shown contestants invested
+    different totals (which requires a side pot/refund), or when a complete
+    reconstruction does not equal the coordinator's authoritative pot. An
+    incomplete history is *not* called ambiguous merely because it cannot be
+    audited: only positive evidence excludes rule learning.
+
+    ``active_seats`` should contain every seat dealt into the hand when replay
+    cards provide that information. Action, winner, shown-card, and button
+    seats are unioned in defensively so ordinary live histories remain useful.
+    """
+
+    participants: set[int] = set()
+    complete = True
+    for raw_seat in active_seats:
+        try:
+            if isinstance(raw_seat, bool):
+                raise ValueError
+            seat = int(raw_seat)
+            if seat < 0:
+                raise ValueError
+            participants.add(seat)
+        except (TypeError, ValueError):
+            complete = False
+    participants.update(hand.shown_numbers)
+    participants.update(hand.winners)
+    participants.update(action.seat for action in hand.actions if action.seat >= 0)
+    if hand.button_seat is not None and hand.button_seat >= 0:
+        participants.add(hand.button_seat)
+
+    seats = sorted(participants)
+    streets: dict[str, dict[int, int]] = {
+        "pre_reveal": {seat: 0 for seat in seats},
+        "post_reveal": {seat: 0 for seat in seats},
+    }
+    maxima = {"pre_reveal": 0, "post_reveal": 0}
+
+    if (
+        hand.button_seat is None
+        or hand.button_seat not in participants
+        or len(seats) < 2
+    ):
+        complete = False
+    else:
+        button_index = seats.index(hand.button_seat)
+        clockwise = seats[button_index + 1 :] + seats[: button_index + 1]
+        if len(seats) == 2:
+            small_seat = hand.button_seat
+            big_seat = next(seat for seat in seats if seat != hand.button_seat)
+        else:
+            small_seat, big_seat = clockwise[:2]
+        small_amount = max(0, int(small_blind))
+        big_amount = max(0, int(big_blind))
+        streets["pre_reveal"][small_seat] = small_amount
+        streets["pre_reveal"][big_seat] = big_amount
+        maxima["pre_reveal"] = big_amount
+
+    for action in hand.actions:
+        street = action.round
+        if street not in streets or action.seat < 0:
+            complete = False
+            continue
+        round_totals = streets[street]
+        before = round_totals.get(action.seat, 0)
+        if action.amount is not None:
+            if action.amount < 0:
+                complete = False
+                continue
+            round_totals[action.seat] = max(before, action.amount)
+        elif action.action == "call":
+            round_totals[action.seat] = max(before, maxima[street])
+        elif action.action in {"bet", "raise"}:
+            # The wager exists but its round total is unavailable, so neither
+            # contribution equality nor pot reconciliation is provable.
+            complete = False
+
+        if action.action in {"bet", "raise"}:
+            maxima[street] = max(
+                maxima[street], round_totals.get(action.seat, 0)
+            )
+
+    totals_by_seat = {
+        seat: sum(round_totals.get(seat, 0) for round_totals in streets.values())
+        for seat in seats
+    }
+    shown_by_seat = {
+        seat: totals_by_seat.get(seat, 0) for seat in hand.shown_numbers
+    }
+    unequal_shown = (
+        complete
+        and len(shown_by_seat) >= 2
+        and len(set(shown_by_seat.values())) > 1
+    )
+    reconstructed_pot = sum(totals_by_seat.values())
+    pot_mismatch = complete and reconstructed_pot != hand.pot
+    return ContributionAudit(
+        totals=tuple(sorted(totals_by_seat.items())),
+        shown_totals=tuple(sorted(shown_by_seat.items())),
+        reconstructed_pot=reconstructed_pot,
+        declared_pot=hand.pot,
+        complete=complete,
+        unequal_shown_contributions=unequal_shown,
+        pot_mismatch=pot_mismatch,
+    )
+
+
 def _context_key(parts: Sequence[str]) -> str:
     return _CONTEXT_SEPARATOR.join(parts)
 
@@ -876,6 +1015,16 @@ class EventKnowledge:
             raw_hand.get("side_pots") or raw_hand.get("multiple_pots")
         ):
             ambiguous = True
+        contribution_audit = audit_showdown_contributions(
+            parsed,
+            full_number_map,
+            small_blind=(
+                max(0, big_blind // 2) if small_blind is None else max(0, small_blind)
+            ),
+            big_blind=max(0, big_blind),
+        )
+        if contribution_audit.ambiguous:
+            ambiguous = True
         learned_rule = False
         if learn_rules and not ambiguous:
             try:
@@ -1152,6 +1301,8 @@ class RuntimeStore:
 
 
 __all__ = [
+    "ContributionAudit",
+    "audit_showdown_contributions",
     "OpponentProfile",
     "MatchState",
     "EventKnowledge",

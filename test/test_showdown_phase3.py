@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -15,6 +16,7 @@ from app.phase3.showdown.api import app
 from app.phase3.showdown.engine import (
     decide_move,
     reset_runtime_for_tests,
+    runtime_identity,
     runtime_snapshot,
 )
 from app.phase3.showdown.equity import (
@@ -22,7 +24,12 @@ from app.phase3.showdown.equity import (
     showdown_metrics_by_subset,
     showdown_share,
 )
-from app.phase3.showdown.learning import EventKnowledge, OpponentProfile, RuntimeStore
+from app.phase3.showdown.learning import (
+    EventKnowledge,
+    OpponentProfile,
+    RuntimeStore,
+    audit_showdown_contributions,
+)
 from app.phase3.showdown.policy import HighVariancePolicy
 from app.phase3.showdown.protocol import (
     ActionRecord,
@@ -31,7 +38,7 @@ from app.phase3.showdown.protocol import (
     safe_fallback,
     validate_response,
 )
-from app.phase3.showdown.replay import fit_replays, write_seed
+from app.phase3.showdown.replay import fit_replays, load_seed, write_seed
 from app.phase3.showdown.rules import RuleModel, get_hypothesis
 from app.phase3.showdown.simulator import (
     ScriptedArchetype,
@@ -327,8 +334,114 @@ class LearningTests(unittest.TestCase):
         self.assertTrue(applied)
         self.assertEqual(knowledge.get_rule("split-rule").observation_count, 1)
 
+    def test_hidden_side_pot_is_excluded_without_losing_action_learning(self) -> None:
+        hand = {
+            "hand_number": 30,
+            "community_number": 3,
+            "winners": [1],
+            "pot": 1005,
+            "button_seat": 0,
+            "shown_numbers": {"1": 7, "5": 3},
+            "actions": [
+                {"round": "pre_reveal", "seat": 5, "action": "raise", "amount": 310},
+                {"round": "pre_reveal", "seat": 0, "action": "fold"},
+                {"round": "pre_reveal", "seat": 1, "action": "raise", "amount": 693},
+                {"round": "pre_reveal", "seat": 4, "action": "fold"},
+            ],
+        }
+        full_numbers = {0: 12, 1: 7, 4: 6, 5: 3}
+        players = {seat: {"name": NAMES[seat]} for seat in full_numbers}
+        knowledge = EventKnowledge()
+
+        learned = knowledge.observe_hand(
+            "amaranth",
+            hand,
+            players,
+            full_numbers,
+            your_seat=0,
+            small_blind=1,
+            big_blind=2,
+        )
+
+        self.assertTrue(learned)
+        self.assertEqual(knowledge.get_rule("amaranth").observation_count, 0)
+        self.assertEqual(
+            sum(profile.observations for profile in knowledge.opponents.values()),
+            3,
+        )
+
+    def test_contribution_audit_accepts_equal_showdown_and_rejects_bad_pot(self) -> None:
+        raw = {
+            "hand_number": 1,
+            "community_number": 3,
+            "winners": [5],
+            "pot": 22,
+            "button_seat": 0,
+            "shown_numbers": {"1": 7, "5": 3},
+            "actions": [
+                {"round": "pre_reveal", "seat": 5, "action": "raise", "amount": 10},
+                {"round": "pre_reveal", "seat": 0, "action": "fold"},
+                {"round": "pre_reveal", "seat": 1, "action": "call"},
+                {"round": "pre_reveal", "seat": 4, "action": "fold"},
+            ],
+        }
+        request = parse_payload(payload(hand_number=2, recent_hands=[raw]))
+        hand = request.recent_hands[0]
+        clean = audit_showdown_contributions(
+            hand, {0, 1, 4, 5}, small_blind=1, big_blind=2
+        )
+        self.assertTrue(clean.complete)
+        self.assertFalse(clean.ambiguous)
+        self.assertEqual(dict(clean.shown_totals), {1: 10, 5: 10})
+
+        bad_pot = type(hand)(
+            hand_number=hand.hand_number,
+            community_number=hand.community_number,
+            winners=hand.winners,
+            pot=23,
+            shown_numbers=hand.shown_numbers,
+            actions=hand.actions,
+            button_seat=hand.button_seat,
+        )
+        audit = audit_showdown_contributions(
+            bad_pot, {0, 1, 4, 5}, small_blind=1, big_blind=2
+        )
+        self.assertTrue(audit.pot_mismatch)
+        self.assertTrue(audit.ambiguous)
+
 
 class ReplayTests(unittest.TestCase):
+    def test_shipped_seed_has_verified_rule_mappings_and_identity(self) -> None:
+        seed_path = (
+            Path(__file__).resolve().parents[1]
+            / "app"
+            / "phase3"
+            / "showdown"
+            / "knowledge.seed.json"
+        )
+        knowledge = load_seed(seed_path)
+        expected = {
+            "verdigris": "standard",
+            "cinnabar": "standard",
+            "obsidian": "pair-last-raw-low",
+            "amaranth": "pair-first-center-match-high",
+        }
+        self.assertEqual(set(knowledge.rules), set(expected))
+        for codename, hypothesis in expected.items():
+            model = knowledge.get_rule(codename)
+            posterior = model.posterior()
+            self.assertEqual(max(posterior, key=posterior.__getitem__), hypothesis)
+            self.assertGreater(model.observation_count, 100)
+            self.assertGreater(model.confidence(), 0.99)
+
+        identity = runtime_identity()
+        self.assertEqual(identity["seed_sources"], 8)
+        self.assertEqual(identity["seed_rules"], expected)
+        self.assertEqual(
+            identity["seed_sha256"],
+            hashlib.sha256(seed_path.read_bytes()).hexdigest(),
+        )
+
     def test_replay_fit_and_duplicate_source_hash(self) -> None:
         document = {
             "table_rule": "opal",

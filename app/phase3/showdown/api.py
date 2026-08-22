@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import FastAPI
 
-from .engine import decide_move
+from .engine import decide_move, runtime_identity
 
 
 app = FastAPI(title="SHOWDOWN Phase 3 Bot", version="1.0.0")
@@ -18,13 +18,10 @@ def health() -> dict[str, str | int]:
 
 
 @app.get("/showdown/runtime")
-def runtime() -> dict[str, str]:
+def runtime() -> dict[str, Any]:
     """Identify the decision engine used by standalone deployments."""
 
-    return {
-        "router": "standalone-v3",
-        "phase3_engine": "app.phase3.showdown.engine",
-    }
+    return {"router": "standalone-v3", **runtime_identity()}
 
 
 @app.post("/move")

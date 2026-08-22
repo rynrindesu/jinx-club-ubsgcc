@@ -26,8 +26,9 @@ Register the Render service base URL with SHOWDOWN. The coordinator appends
 `/move` when requesting a decision.
 
 For Phase 3, `GET /showdown/runtime` must report `phase-aware-v3` and
-`app.phase3.showdown.engine`. This verifies that the gateway is not falling
-back to an earlier SHOWDOWN policy.
+`app.phase3.showdown.engine`. It also reports the startup seed hash, source
+count, and inferred rule summary. This verifies both the route and the exact
+knowledge artifact loaded by the deployment.
 
 Ghost Chains now defaults to the cumulative Phase 3 engine. Set
 `GHOST_CHAINS_PHASE=1` or `GHOST_CHAINS_PHASE=2` only when evaluating an older

@@ -13,6 +13,7 @@ uvicorn app.phase3.showdown.api:app --host 0.0.0.0 --port 8000
 Register the public HTTPS base URL with the coordinator. The service exposes:
 
 - `GET /health`
+- `GET /showdown/runtime` (engine, seed hash, and learned rule summary)
 - `POST /move`
 
 Runtime learning is process-local. Set `SHOWDOWN_PHASE3_SEED` to load a seed

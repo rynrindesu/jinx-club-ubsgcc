@@ -24,6 +24,7 @@ from .phase3.ghost_chains import (
 )
 from .phase04.stonkers import solve_cases as solve_stonks_cases
 from .showdown import decide_move
+from .phase3.showdown.engine import runtime_identity as showdown_runtime_identity
 from .phase3.toolbox.server import mcp
 
 mcp_app = mcp.http_app(path="/")
@@ -94,13 +95,10 @@ def health_endpoint():
 
 
 @app.get("/showdown/runtime")
-def showdown_runtime_endpoint() -> dict[str, str]:
+def showdown_runtime_endpoint() -> dict[str, Any]:
     """Identify the Phase 3 route so deployments can be verified directly."""
 
-    runtime = {
-        "router": "phase-aware-v3",
-        "phase3_engine": "app.phase3.showdown.engine",
-    }
+    runtime = {"router": "phase-aware-v3", **showdown_runtime_identity()}
     if revision := os.getenv("RENDER_GIT_COMMIT"):
         runtime["revision"] = revision
     if instance := os.getenv("RENDER_INSTANCE_ID"):

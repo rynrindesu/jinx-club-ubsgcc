@@ -152,12 +152,6 @@ def _with_equality(
     return evaluator
 
 
-def _center_then_pair_high(number: int, community: int) -> Rank:
-    """Prefer the exact center, then a community pair, then raw high."""
-
-    return (int(number == CENTER), int(number == community), number)
-
-
 def _ordering_signature(evaluator: RankEvaluator) -> tuple[int, ...]:
     """Canonical signature used to remove semantically duplicate formulas."""
 
@@ -197,18 +191,6 @@ def _build_hypotheses() -> tuple[RuleHypothesis, ...]:
                     _with_equality(evaluator, pair_first=pair_first),
                 )
             )
-
-    # Equality and center priority do not necessarily compose with equality on
-    # the outside.  Keep this ordering distinct from
-    # ``pair-first-center-match-high``: here the exact center beats even a
-    # community pair, while an ordinary pair still beats every raw number.
-    candidates.append(
-        RuleHypothesis(
-            "center-first-pair-first-raw-high",
-            3.0,
-            _center_then_pair_high,
-        )
-    )
 
     canonical: list[RuleHypothesis] = []
     seen: set[tuple[int, ...]] = set()

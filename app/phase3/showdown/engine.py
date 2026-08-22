@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 import threading
@@ -27,8 +28,39 @@ def _configured_seed_path() -> Path:
     return Path(configured).expanduser() if configured else _PACKAGE_SEED
 
 
-_store = RuntimeStore(_configured_seed_path())
+_SEED_PATH = _configured_seed_path()
+_store = RuntimeStore(_SEED_PATH)
 _policy = HighVariancePolicy()
+
+
+def _seed_digest(path: Path) -> str:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return "unavailable"
+
+
+def _rule_summary(knowledge: EventKnowledge) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for codename, model in sorted(knowledge.rules.items()):
+        try:
+            posterior = model.posterior()
+            if posterior:
+                result[codename] = max(posterior, key=posterior.__getitem__)
+        except (AttributeError, TypeError, ValueError):
+            continue
+    return result
+
+
+# This describes the seed actually loaded at process start. Runtime learning is
+# deliberately in-memory and must not make deployment verification drift.
+_STARTUP_IDENTITY: dict[str, Any] = {
+    "phase3_engine": "app.phase3.showdown.engine",
+    "seed_file": _SEED_PATH.name,
+    "seed_sha256": _seed_digest(_SEED_PATH),
+    "seed_sources": len(_store.knowledge.source_hashes),
+    "seed_rules": _rule_summary(_store.knowledge),
+}
 
 
 def decide_move(payload: Mapping[str, Any]) -> dict[str, str | int]:
@@ -73,4 +105,18 @@ def runtime_snapshot() -> dict[str, Any]:
         return _store.knowledge.to_dict()
 
 
-__all__ = ["decide_move", "reset_runtime_for_tests", "runtime_snapshot"]
+def runtime_identity() -> dict[str, Any]:
+    """Return immutable startup metadata suitable for deployment checks."""
+
+    return {
+        **_STARTUP_IDENTITY,
+        "seed_rules": dict(_STARTUP_IDENTITY["seed_rules"]),
+    }
+
+
+__all__ = [
+    "decide_move",
+    "reset_runtime_for_tests",
+    "runtime_identity",
+    "runtime_snapshot",
+]
