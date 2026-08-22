@@ -392,6 +392,131 @@ def _sweep_route(minimum_year: int, prices: dict[int, dict[str, int]]) -> list[i
     return [PRESENT_YEAR, *interior, *inbound, PRESENT_YEAR]
 
 
+def _route_cost(route: list[int]) -> int:
+    return sum(abs(right - left) for left, right in zip(route, route[1:]))
+
+
+def _compact_route(years: Iterable[int]) -> list[int]:
+    route: list[int] = []
+    for year in years:
+        if not route or route[-1] != year:
+            route.append(year)
+    if not route or route[0] != PRESENT_YEAR:
+        route.insert(0, PRESENT_YEAR)
+    if route[-1] != PRESENT_YEAR:
+        route.append(PRESENT_YEAR)
+    return route
+
+
+def _promising_turn_years(
+    reachable: list[int],
+    listings: list[_Listing],
+    prices: dict[int, dict[str, int]],
+) -> list[int]:
+    """Rank trip depths by the inventory profit they make reachable."""
+
+    best_price: dict[str, int] = {}
+    for year_prices in prices.values():
+        for stock, price in year_prices.items():
+            best_price[stock] = max(best_price.get(stock, 0), price)
+
+    score_by_year = {year: 0 for year in reachable}
+    for listing in listings:
+        if listing.year not in score_by_year:
+            continue
+        profit = best_price.get(listing.stock, listing.price) - listing.price
+        if profit > 0:
+            score_by_year[listing.year] += profit * listing.qty
+    return sorted(
+        reachable,
+        key=lambda year: (
+            -score_by_year[year],
+            PRESENT_YEAR - year,
+        ),
+    )
+
+
+def _candidate_routes(
+    energy: int,
+    capital: int,
+    listings: list[_Listing],
+    prices: dict[int, dict[str, int]],
+) -> list[list[int]]:
+    reachable = sorted(
+        year
+        for year in prices
+        if year < PRESENT_YEAR
+        and 2 * (PRESENT_YEAR - year) <= energy
+    )
+    if not reachable:
+        return []
+
+    route_limit = 5 if len(listings) > 250 else 9 if len(listings) > 80 else 16
+    if len(reachable) > route_limit:
+        positions = {
+            round(index * (len(reachable) - 1) / (route_limit - 1))
+            for index in range(route_limit)
+        }
+        sampled = [reachable[index] for index in sorted(positions)]
+    else:
+        sampled = reachable
+
+    promising = _promising_turn_years(reachable, listings, prices)
+    trip_years = list(dict.fromkeys(promising[:10] + sampled))
+    routes: list[list[int]] = [_sweep_route(year, prices) for year in sampled]
+
+    # A shallow first trip can multiply the starting cash before a deeper trip
+    # consumes a large, otherwise only-partly-affordable lot.  Order matters.
+    for first_year in trip_years[:8]:
+        first = _sweep_route(first_year, prices)
+        first_cost = _route_cost(first)
+        for second_year in trip_years[:10]:
+            second = _sweep_route(second_year, prices)
+            if first_cost + _route_cost(second) <= energy:
+                routes.append(_compact_route([*first, *second[1:]]))
+
+    # Isolated pair tours avoid being distracted by marginal listings on the
+    # way to an especially strong non-home sale.  Score with affordable gain.
+    pair_routes: list[tuple[Fraction, int, list[int]]] = []
+    for listing in listings:
+        affordable = min(listing.qty, capital // listing.price)
+        if affordable <= 0:
+            continue
+        for sell_year, year_prices in prices.items():
+            sell_price = year_prices.get(listing.stock)
+            if sell_price is None or sell_price <= listing.price:
+                continue
+            route = _compact_route(
+                [PRESENT_YEAR, listing.year, sell_year, PRESENT_YEAR]
+            )
+            cost = _route_cost(route)
+            if cost <= 0 or cost > energy:
+                continue
+            gain = affordable * (sell_price - listing.price)
+            pair_routes.append(
+                (
+                    Fraction(gain, cost),
+                    gain,
+                    route,
+                )
+            )
+    pair_routes.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    routes.extend(route for _, _, route in pair_routes[:24])
+
+    max_routes = 45 if len(listings) > 250 else 90 if len(listings) > 80 else 140
+    unique: list[list[int]] = []
+    seen: set[tuple[int, ...]] = set()
+    for route in routes:
+        key = tuple(route)
+        if key in seen or _route_cost(route) > energy:
+            continue
+        seen.add(key)
+        unique.append(route)
+        if len(unique) >= max_routes:
+            break
+    return unique
+
+
 def _future_sale(
     route: list[int],
     route_index: int,
@@ -576,26 +701,9 @@ def _best_sweep(
     listings: list[_Listing],
     prices: dict[int, dict[str, int]],
 ) -> tuple[int, list[str]]:
-    reachable = sorted(
-        {
-            year
-            for year in prices
-            if year < PRESENT_YEAR
-            and 2 * (PRESENT_YEAR - year) <= energy
-        }
-    )
-    if not reachable:
+    routes = _candidate_routes(energy, capital, listings, prices)
+    if not routes:
         return capital, []
-
-    # Trying several turning points helps a greedy policy avoid tying up cash on
-    # an unnecessarily deep route, while keeping large timelines inexpensive.
-    route_limit = 4 if len(listings) > 250 else 8 if len(listings) > 80 else 16
-    if len(reachable) > route_limit:
-        positions = {
-            round(index * (len(reachable) - 1) / (route_limit - 1))
-            for index in range(route_limit)
-        }
-        reachable = [reachable[index] for index in sorted(positions)]
 
     best_cash = capital
     best_actions: list[str] = []
@@ -616,13 +724,7 @@ def _best_sweep(
             "knapsack",
         )
     )
-    for minimum_year in reachable:
-        route = _sweep_route(minimum_year, prices)
-        if sum(
-            abs(right - left)
-            for left, right in zip(route, route[1:])
-        ) > energy:
-            continue
+    for route in routes:
         target_cache: dict[
             tuple[str, int, int], tuple[int, int] | None
         ] = {}

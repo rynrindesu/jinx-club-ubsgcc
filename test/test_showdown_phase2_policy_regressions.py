@@ -402,6 +402,11 @@ class Phase2PolicyRegressionTests(unittest.TestCase):
             bet_this_round=21,
         )
         risk = _risk_context(request)
+        passive = replace(
+            neutral_profile(),
+            aggression_rate=0.25,
+            decisions=20,
+        )
 
         self.assertEqual(
             _post_reveal_move(
@@ -416,11 +421,7 @@ class Phase2PolicyRegressionTests(unittest.TestCase):
             _post_reveal_move(
                 request,
                 learned_equity(0.701),
-                replace(
-                    neutral_profile(),
-                    aggression_rate=0.25,
-                    decisions=20,
-                ),
+                passive,
                 risk,
             ),
             {"action": "call"},
@@ -434,13 +435,62 @@ class Phase2PolicyRegressionTests(unittest.TestCase):
             ),
             {"action": "fold"},
         )
+
+        initiative = copy.deepcopy(request)
+        initiative["current_hand_actions"][:2] = [
+            {
+                "round": "pre_reveal",
+                "seat": 1,
+                "action": "call",
+                "amount": 2,
+            },
+            {
+                "round": "pre_reveal",
+                "seat": 0,
+                "action": "raise",
+                "amount": 5,
+            },
+            {
+                "round": "pre_reveal",
+                "seat": 1,
+                "action": "call",
+                "amount": 5,
+            },
+        ]
+        self.assertEqual(
+            _post_reveal_move(
+                initiative,
+                learned_equity(0.585),
+                passive,
+                _risk_context(initiative),
+            ),
+            {"action": "call"},
+        )
+        self.assertEqual(
+            _post_reveal_move(
+                initiative,
+                learned_equity(0.549),
+                passive,
+                _risk_context(initiative),
+            ),
+            {"action": "fold"},
+        )
+        self.assertEqual(
+            _post_reveal_move(
+                request,
+                learned_equity(0.585),
+                passive,
+                risk,
+            ),
+            {"action": "fold"},
+        )
         ambiguous = replace(learned_equity(0.75), candidate_count=2)
         self.assertEqual(
             _post_reveal_move(request, ambiguous, neutral_profile(), risk),
             {"action": "fold"},
         )
 
-        expensive = copy.deepcopy(request)
+        expensive = copy.deepcopy(initiative)
         expensive.update(pot=50, to_call=30, min_raise_to=66)
         expensive["current_hand_actions"][-1]["amount"] = 35
         expensive["players"][1].update(stack=167, bet_this_round=35)
@@ -450,6 +500,28 @@ class Phase2PolicyRegressionTests(unittest.TestCase):
                 learned_equity(0.75),
                 neutral_profile(),
                 _risk_context(expensive),
+            ),
+            {"action": "fold"},
+        )
+
+        guarded = copy.deepcopy(initiative)
+        guarded.update(hand_number=37, your_stack=216)
+        guarded["players"][0].update(
+            chip_delta=26,
+            stack=216,
+        )
+        guarded["players"][1].update(
+            chip_delta=-26,
+            stack=148,
+        )
+        guarded_risk = _risk_context(guarded)
+        self.assertEqual(guarded_risk.tier, "guarded")
+        self.assertEqual(
+            _post_reveal_move(
+                guarded,
+                learned_equity(0.75),
+                passive,
+                guarded_risk,
             ),
             {"action": "fold"},
         )

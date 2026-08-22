@@ -315,10 +315,16 @@ def _post_reveal_move(
                 and risk.tier in {"normal", "press", "chase"}
                 and _we_bet_without_raising_this_round(payload)
             ):
-                # Once the rule is exactly identified, take a favorable
-                # closing price with a strong hand.  Keep the stricter floor
-                # for expensive calls, protected leads, and raise wars.
-                reopen_floor = 0.70
+                # The opponent's raise is less conclusive when we were the
+                # sole pre-reveal aggressor: with an exact rule and a cheap
+                # closing price, continue with majority equity.  When the
+                # opponent also raised pre-reveal, retain the stronger floor
+                # because both streets consistently represent strength.
+                reopen_floor = (
+                    0.55
+                    if _we_were_sole_pre_reveal_raiser(payload)
+                    else 0.70
+                )
             required = max(
                 required,
                 reopen_floor,
@@ -781,6 +787,20 @@ def _we_bet_without_raising_this_round(payload: Mapping[str, Any]) -> bool:
         and action.get("action") in {"bet", "raise"}
     ]
     return hero_wagers == ["bet"]
+
+
+def _we_were_sole_pre_reveal_raiser(payload: Mapping[str, Any]) -> bool:
+    """Whether hero made every raise before the reveal."""
+
+    your_seat = payload.get("your_seat")
+    raisers = [
+        action.get("seat")
+        for action in _round_actions(payload, "pre_reveal")
+        if action.get("action") == "raise"
+    ]
+    return bool(raisers) and all(
+        str(seat) == str(your_seat) for seat in raisers
+    )
 
 
 def _latest_opponent_raise_total(payload: Mapping[str, Any]) -> int | None:

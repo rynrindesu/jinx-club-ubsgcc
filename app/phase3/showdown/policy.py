@@ -932,6 +932,11 @@ class HighVariancePolicy:
     def _is_desperate(request: Any, remaining_hands: int) -> bool:
         """Require genuine closing pressure before disabling safety gates."""
 
+        # A huge pot can create a 400+ chip leader on hand one.  That is not a
+        # reason to disable every exposure/value guard for the next 50 hands;
+        # desperation is an endgame mode only.
+        if remaining_hands > 12:
+            return False
         leader = max(
             (
                 player.chip_delta
