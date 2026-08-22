@@ -1,7 +1,9 @@
 import heapq
 import json
 
-from collections import defaultdict, deque
+from bisect import bisect_right
+from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from fractions import Fraction
 from itertools import count
@@ -29,28 +31,80 @@ def exact_seconds_between(later, earlier):
     return Fraction(whole_seconds) + fractional_seconds
 
 
-def speed_at(time_value, intervals):
+@dataclass(frozen=True)
+class TrafficSchedule:
+    """Piecewise-constant speeds for one directed edge.
+
+    ``speeds[i]`` applies from ``boundaries[i - 1]`` (or negative infinity
+    for ``i == 0``) up to ``boundaries[i]`` (or positive infinity for the
+    final entry).  This lets a traversal jump directly to its next traffic
+    change rather than repeatedly scanning every obstruction.
     """
-    Return the applicable speed factor.
 
-    Intervals are treated as:
-        start_time <= current_time < end_time
+    boundaries: tuple[Fraction, ...]
+    speeds: tuple[Fraction, ...]
+
+    def segment_at(self, time_value: Fraction) -> tuple[Fraction, Fraction | None]:
+        index = bisect_right(self.boundaries, time_value)
+        next_change = (
+            self.boundaries[index]
+            if index < len(self.boundaries)
+            else None
+        )
+        return self.speeds[index], next_change
+
+    @property
+    def maximum_speed(self) -> Fraction:
+        return max(self.speeds)
+
+
+EMPTY_SCHEDULE = TrafficSchedule((), (Fraction(1),))
+
+
+def build_traffic_schedule(
+    intervals: list[tuple[Fraction, Fraction, Fraction]],
+) -> TrafficSchedule:
+    """Combine potentially overlapping obstructions into speed segments.
+
+    The challenge does not specify overlap semantics.  Like the original
+    implementation, overlapping obstructions use the most restrictive
+    (lowest) speed factor.
     """
-    active_factors = [
-        factor
-        for start, end, factor in intervals
-        if start <= time_value < end
-    ]
 
-    if not active_factors:
-        return Fraction(1)
+    if not intervals:
+        return EMPTY_SCHEDULE
 
-    # The question does not define overlapping obstructions.
-    # This assumes the most restrictive factor applies.
-    return min(active_factors)
+    events: dict[Fraction, list[tuple[int, Fraction]]] = defaultdict(list)
+    for start, end, factor in intervals:
+        events[start].append((1, factor))
+        events[end].append((-1, factor))
+
+    active_counts: dict[Fraction, int] = defaultdict(int)
+    active_speeds: list[Fraction] = []
+    boundaries = sorted(events)
+    speeds = [Fraction(1)]
+
+    for boundary in boundaries:
+        for change, factor in events[boundary]:
+            if change > 0:
+                active_counts[factor] += 1
+                heapq.heappush(active_speeds, factor)
+            else:
+                active_counts[factor] -= 1
+
+        while active_speeds and active_counts[active_speeds[0]] <= 0:
+            heapq.heappop(active_speeds)
+
+        speeds.append(active_speeds[0] if active_speeds else Fraction(1))
+
+    return TrafficSchedule(tuple(boundaries), tuple(speeds))
 
 
-def traverse_edge(departure, base_duration, intervals):
+def traverse_edge(
+    departure: Fraction,
+    base_duration: Fraction,
+    schedule: TrafficSchedule,
+) -> Fraction | None:
     """
     Calculate the arrival time after traversing one directed edge.
 
@@ -58,30 +112,21 @@ def traverse_edge(departure, base_duration, intervals):
     At speed factor f, f units of work are completed per second.
     """
     # A road blocked when we are still at the node cannot be entered.
-    if speed_at(departure, intervals) <= 0:
+    departure_speed, _ = schedule.segment_at(departure)
+    if departure_speed <= 0:
         return None
 
-    remaining = Fraction(base_duration)
+    remaining = base_duration
     current_time = departure
 
     while remaining > 0:
-        current_speed = speed_at(current_time, intervals)
+        current_speed, next_change = schedule.segment_at(current_time)
 
-        # Find the next time at which an obstruction starts or ends.
-        future_changes = [
-            boundary
-            for start, end, _ in intervals
-            for boundary in (start, end)
-            if boundary > current_time
-        ]
-
-        if not future_changes:
+        if next_change is None:
             if current_speed <= 0:
                 return None
 
             return current_time + remaining / current_speed
-
-        next_change = min(future_changes)
 
         # If a closure began after entering the edge, no progress is
         # made until that closure changes or ends.
@@ -99,6 +144,47 @@ def traverse_edge(departure, base_duration, intervals):
         current_time = next_change
 
     return current_time
+
+
+def optimistic_distances(
+    graph: Mapping[
+        tuple[int, int],
+        list[tuple[tuple[int, int], str, Fraction, TrafficSchedule]],
+    ],
+    destination: tuple[int, int],
+) -> dict[tuple[int, int], Fraction]:
+    """Return admissible remaining-time lower bounds for A*.
+
+    Each road is assigned its fastest speed seen in its complete schedule.
+    That can only underestimate real travel time, so it is safe for pruning
+    even though a real driver cannot wait for a favourable traffic window.
+    """
+
+    reverse_graph: dict[tuple[int, int], list[tuple[tuple[int, int], Fraction]]]
+    reverse_graph = defaultdict(list)
+    for node, edges in graph.items():
+        for neighbour, _, base_duration, schedule in edges:
+            lower_bound = base_duration / schedule.maximum_speed
+            reverse_graph[neighbour].append((node, lower_bound))
+
+    distances = {destination: Fraction(0)}
+    sequence = count()
+    frontier = [(Fraction(0), next(sequence), destination)]
+
+    while frontier:
+        distance, _, node = heapq.heappop(frontier)
+        if distances.get(node) != distance:
+            continue
+
+        for predecessor, edge_cost in reverse_graph.get(node, []):
+            candidate = distance + edge_cost
+            previous_distance = distances.get(predecessor)
+            if previous_distance is not None and candidate >= previous_distance:
+                continue
+            distances[predecessor] = candidate
+            heapq.heappush(frontier, (candidate, next(sequence), predecessor))
+
+    return distances
 
 
 def unreachable_result():
@@ -138,7 +224,7 @@ def solve_case(input_data: Mapping[str, Any]) -> dict[str, Any]:
     #
     # Value:
     #     list of (start_elapsed, end_elapsed, speed_factor)
-    schedules = defaultdict(list)
+    raw_schedules = defaultdict(list)
 
     # After this time every obstruction has ended.
     obstruction_horizon = Fraction(0)
@@ -162,13 +248,15 @@ def solve_case(input_data: Mapping[str, Any]) -> dict[str, Any]:
             starting_datetime
         )
 
-        # Ignore invalid or empty intervals.
-        if interval_end <= interval_start:
+        # Intervals that have already ended cannot affect a route starting at
+        # elapsed time zero.  Clip an already-active interval to departure.
+        if interval_end <= interval_start or interval_end <= 0:
             continue
+        interval_start = max(interval_start, Fraction(0))
 
         factor = Fraction(str(obstruction["speed_factor"]))
 
-        schedules[key].append((
+        raw_schedules[key].append((
             interval_start,
             interval_end,
             factor
@@ -179,11 +267,13 @@ def solve_case(input_data: Mapping[str, Any]) -> dict[str, Any]:
             interval_end
         )
 
-    for intervals in schedules.values():
-        intervals.sort(key=lambda interval: (interval[0], interval[1]))
+    schedules = {
+        key: build_traffic_schedule(intervals)
+        for key, intervals in raw_schedules.items()
+    }
 
     # Each adjacency entry contains:
-    # (neighbor, edge_id, base_duration, directional_intervals)
+    # (neighbor, edge_id, base_duration, directional_traffic_schedule)
     graph = {
         tuple(node): []
         for node in input_data["nodes"]
@@ -195,41 +285,34 @@ def solve_case(input_data: Mapping[str, Any]) -> dict[str, Any]:
         edge_id = edge["edge_id"]
         base_duration = Fraction(edge["base_duration_sec"])
 
-        forward_intervals = schedules[
-            (edge_id, node1, node2)
-        ]
+        forward_schedule = schedules.get(
+            (edge_id, node1, node2),
+            EMPTY_SCHEDULE,
+        )
 
-        reverse_intervals = schedules[
-            (edge_id, node2, node1)
-        ]
+        reverse_schedule = schedules.get(
+            (edge_id, node2, node1),
+            EMPTY_SCHEDULE,
+        )
 
         graph.setdefault(node1, []).append((
             node2,
             edge_id,
             base_duration,
-            forward_intervals
+            forward_schedule
         ))
 
         graph.setdefault(node2, []).append((
             node1,
             edge_id,
             base_duration,
-            reverse_intervals
+            reverse_schedule
         ))
 
-    # Quick check using the road network without considering traffic.
-    reachable_nodes = {start}
-    search_queue = deque([start])
-
-    while search_queue:
-        current = search_queue.popleft()
-
-        for neighbor, _, _, _ in graph.get(current, []):
-            if neighbor not in reachable_nodes:
-                reachable_nodes.add(neighbor)
-                search_queue.append(neighbor)
-
-    if destination not in reachable_nodes:
+    # These lower bounds both prioritize promising states and identify nodes
+    # that cannot reach the destination even before traffic is considered.
+    remaining_lower_bound = optimistic_distances(graph, destination)
+    if start not in remaining_lower_bound:
         return unreachable_result()
 
     zero = Fraction(0)
@@ -252,16 +335,21 @@ def solve_case(input_data: Mapping[str, Any]) -> dict[str, Any]:
 
     sequence = count()
 
-    # Heap entries:
-    # (elapsed_time, insertion_order, node)
+    # Heap entries are ordered by A* priority, then elapsed time:
+    # (elapsed_time + optimistic_remaining, elapsed_time, insertion_order, node)
     frontier = [
-        (zero, next(sequence), start)
+        (
+            remaining_lower_bound[start],
+            zero,
+            next(sequence),
+            start,
+        )
     ]
 
     final_state = None
 
     while frontier:
-        elapsed, _, node = heapq.heappop(frontier)
+        _, elapsed, _, node = heapq.heappop(frontier)
         state = (node, elapsed)
 
         # Ignore an outdated post-obstruction state.
@@ -277,13 +365,17 @@ def solve_case(input_data: Mapping[str, Any]) -> dict[str, Any]:
             neighbor,
             edge_id,
             base_duration,
-            intervals
+            schedule
         ) in graph.get(node, []):
+
+            # Reaching this node cannot lead to the destination.
+            if neighbor not in remaining_lower_bound:
+                continue
 
             arrival = traverse_edge(
                 elapsed,
                 base_duration,
-                intervals
+                schedule
             )
 
             # This directed road cannot currently be entered.
@@ -313,7 +405,12 @@ def solve_case(input_data: Mapping[str, Any]) -> dict[str, Any]:
 
             heapq.heappush(
                 frontier,
-                (arrival, next(sequence), neighbor)
+                (
+                    arrival + remaining_lower_bound[neighbor],
+                    arrival,
+                    next(sequence),
+                    neighbor,
+                )
             )
 
     if final_state is None:
