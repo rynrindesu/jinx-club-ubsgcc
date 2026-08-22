@@ -14,6 +14,8 @@ import httpx
 
 
 TOKEN_BUDGET = 900
+MAX_PASSAGES = 3
+MAX_PASSAGE_TOKENS = 260
 _STOP_WORDS = frozenset(
     {
         "a", "an", "and", "are", "at", "by", "did", "do", "for", "from",
@@ -21,6 +23,19 @@ _STOP_WORDS = frozenset(
         "what", "when", "where", "which", "who", "with",
     }
 )
+_SYNONYM_GROUPS = (
+    frozenset({"fault", "failure", "malfunction", "breakdown", "defect"}),
+    frozenset({"mechanical", "machinery", "machine", "equipment", "compressor", "engine"}),
+    frozenset({"cold", "refrigeration", "refrigerated", "chilled", "freezer"}),
+    frozenset({"threaten", "risk", "endanger", "jeopardize"}),
+)
+_STEM_EQUIVALENTS = {
+    "stored": "store",
+    "storage": "store",
+    "stores": "store",
+    "threatened": "threaten",
+    "threatening": "threaten",
+}
 
 
 class Encoder(Protocol):
@@ -34,6 +49,14 @@ class StudyDocument:
     title: str
     url: str
     text: str
+
+
+@dataclass(frozen=True)
+class _SentenceCandidate:
+    score: int
+    matched_terms: frozenset[str]
+    source: tuple[str, str, int]
+    passage: str
 
 
 class _StudyPageParser(HTMLParser):
@@ -121,31 +144,45 @@ def select_passages(
 
     encoder = encoder or _o200k_encoder()
     terms = _query_terms(question)
-    candidates: list[tuple[int, str]] = []
+    phrases = _query_phrases(question)
+    candidates: list[_SentenceCandidate] = []
     for document in documents:
-        for paragraph in _paragraphs(document.text):
-            passage = f"{document.title}\n{paragraph}".strip()
-            candidates.append((_relevance_score(passage, question, terms), passage))
+        candidates.extend(_sentence_candidates(document, terms, phrases))
+    if not candidates:
+        raise ValueError("the study documents contained no usable sentences")
 
     chosen: list[str] = []
     remaining = TOKEN_BUDGET
-    seen: set[str] = set()
-    for score, passage in sorted(candidates, key=lambda candidate: candidate[0], reverse=True):
-        if score <= 0 or passage in seen or remaining == 0:
+    covered_terms: set[str] = set()
+    selected_sources: list[tuple[str, str, int]] = []
+    for candidate in sorted(candidates, key=lambda candidate: candidate.score, reverse=True):
+        if candidate.score <= 0 or remaining == 0 or len(chosen) == MAX_PASSAGES:
             continue
-        seen.add(passage)
-        tokens = encoder.encode(passage)
-        if len(tokens) <= remaining:
-            chosen.append(passage)
+        if _overlaps_selected_window(candidate.source, selected_sources):
+            continue
+        if chosen and not candidate.matched_terms - covered_terms:
+            continue
+
+        tokens = encoder.encode(candidate.passage)
+        passage_budget = min(remaining, MAX_PASSAGE_TOKENS)
+        if len(tokens) <= passage_budget:
+            chosen.append(candidate.passage)
             remaining -= len(tokens)
         else:
-            chosen.append(encoder.decode(tokens[:remaining]))
-            remaining = 0
+            chosen.append(encoder.decode(tokens[:passage_budget]))
+            remaining -= passage_budget
+        covered_terms.update(candidate.matched_terms)
+        selected_sources.append(candidate.source)
 
     if not chosen:
-        # Return a bounded first passage even if a query shares no exact terms.
-        tokens = encoder.encode(candidates[0][1])
-        chosen.append(encoder.decode(tokens[:TOKEN_BUDGET]))
+        # Return one compact sentence window even if no words match exactly.
+        tokens = encoder.encode(candidates[0].passage)
+        passage_budget = min(TOKEN_BUDGET, MAX_PASSAGE_TOKENS)
+        chosen.append(
+            candidates[0].passage
+            if len(tokens) <= passage_budget
+            else encoder.decode(tokens[:passage_budget])
+        )
     return chosen
 
 
@@ -203,26 +240,142 @@ def _parse_html(value: str) -> _StudyPageParser:
     return parser
 
 
-def _paragraphs(text: str) -> list[str]:
-    paragraphs = [
-        re.sub(r"\s+", " ", paragraph).strip()
-        for paragraph in re.split(r"\n\s*\n", text)
+def _sentence_candidates(
+    document: StudyDocument,
+    query_terms: set[str],
+    query_phrases: set[str],
+) -> list[_SentenceCandidate]:
+    candidates: list[_SentenceCandidate] = []
+    for heading, section in _sections(document):
+        sentences = _sentences(section)
+        for index, sentence in enumerate(sentences):
+            score, matched_terms = _sentence_score(
+                heading, sentence, query_terms, query_phrases
+            )
+            candidates.append(
+                _SentenceCandidate(
+                    score=score,
+                    matched_terms=frozenset(matched_terms),
+                    source=(document.url, heading, index),
+                    passage=_sentence_window(heading, sentences, index),
+                )
+            )
+    return candidates
+
+
+def _sections(document: StudyDocument) -> list[tuple[str, str]]:
+    """Split Markdown-style study material into heading-labelled sections."""
+
+    sections: list[tuple[str, str]] = []
+    heading = document.title
+    lines: list[str] = []
+    for line in document.text.splitlines():
+        match = re.match(r"^\s*#{1,6}\s+(.+?)\s*$", line)
+        if match:
+            body = "\n".join(lines).strip()
+            if body:
+                sections.append((heading, body))
+            heading = match.group(1)
+            lines = []
+        else:
+            lines.append(line)
+
+    body = "\n".join(lines).strip()
+    if body:
+        sections.append((heading, body))
+    return sections
+
+
+def _sentences(text: str) -> list[str]:
+    """Keep factual sentences intact while tolerating plain Markdown or HTML text."""
+
+    normalised = re.sub(r"\s+", " ", text).strip()
+    if not normalised:
+        return []
+    return [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])", normalised)
+        if sentence.strip()
     ]
-    return [paragraph for paragraph in paragraphs if paragraph]
+
+
+def _sentence_window(heading: str, sentences: list[str], index: int) -> str:
+    """Return a matching sentence, adding context only for anaphoric wording."""
+
+    context = [f"{heading}\n{sentences[index]}"]
+    if index > 0 and re.match(
+        r"^(it|this|that|they|these|those|the (incident|event|failure))\b",
+        sentences[index],
+        re.IGNORECASE,
+    ):
+        context.append(f"Previous context: {sentences[index - 1]}")
+    return "\n".join(context)
+
+
+def _overlaps_selected_window(
+    source: tuple[str, str, int],
+    selected_sources: list[tuple[str, str, int]],
+) -> bool:
+    url, heading, sentence_index = source
+    return any(
+        selected_url == url
+        and selected_heading == heading
+        and abs(selected_index - sentence_index) <= 2
+        for selected_url, selected_heading, selected_index in selected_sources
+    )
 
 
 def _query_terms(question: str) -> set[str]:
     return {
-        term
-        for term in re.findall(r"[a-z0-9]+", question.lower())
+        _normalise_term(term)
+        for term in _tokens(question)
         if len(term) > 1 and term not in _STOP_WORDS
     }
 
 
-def _relevance_score(passage: str, question: str, terms: set[str]) -> int:
-    lowered = passage.lower()
-    score = sum(lowered.count(term) for term in terms)
-    phrase = " ".join(re.findall(r"[a-z0-9]+", question.lower()))
-    if phrase and phrase in lowered:
-        score += len(terms) * 3
-    return score
+def _query_phrases(question: str) -> set[str]:
+    terms = [
+        _normalise_term(term)
+        for term in _tokens(question)
+        if len(term) > 1 and term not in _STOP_WORDS
+    ]
+    return {f"{first} {second}" for first, second in zip(terms, terms[1:])}
+
+
+def _sentence_score(
+    heading: str,
+    sentence: str,
+    query_terms: set[str],
+    query_phrases: set[str],
+) -> tuple[int, set[str]]:
+    sentence_terms = {_normalise_term(term) for term in _tokens(f"{heading} {sentence}")}
+    exact_matches = sentence_terms & query_terms
+    synonym_matches = {
+        term
+        for term in query_terms - exact_matches
+        if sentence_terms & _synonyms_for(term)
+    }
+    score = len(exact_matches) * 8 + len(synonym_matches) * 3
+
+    # Reward adjacent query phrases such as "cold store" without requiring the
+    # source to use the same hyphenation as the question.
+    normalised_sentence = " ".join(_normalise_term(term) for term in _tokens(sentence))
+    for phrase in query_phrases:
+        if phrase in normalised_sentence:
+            score += 4
+    return score, exact_matches | synonym_matches
+
+
+def _tokens(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower().replace("-", " "))
+
+
+def _normalise_term(term: str) -> str:
+    return _STEM_EQUIVALENTS.get(term, term)
+
+
+def _synonyms_for(term: str) -> frozenset[str]:
+    for group in _SYNONYM_GROUPS:
+        if term in group:
+            return group
+    return frozenset({term})

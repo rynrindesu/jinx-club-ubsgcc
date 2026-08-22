@@ -101,6 +101,30 @@ class StudySelectionTests(unittest.TestCase):
 
         self.assertLessEqual(sum(len(encoder.encode(passage)) for passage in passages), 900)
 
+    def test_returns_a_compact_synonym_matched_sentence_window(self):
+        documents = (
+            StudyDocument(
+                "Growers Cooperative",
+                "https://example.test/growers",
+                "## Cold Store\n"
+                "Routine inventory checks took place throughout the spring. "
+                "A refrigeration compressor failure on 6 April threatened the stored fruit. "
+                "The backup unit restored the required temperature before noon. "
+                "The cooperative later updated its maintenance schedule.",
+            ),
+        )
+
+        passages = select_passages(
+            "On what date did a mechanical fault in the cold-store threaten the stored fruit?",
+            documents,
+            CharacterEncoder(),
+        )
+
+        self.assertEqual(len(passages), 1)
+        self.assertIn("6 April", passages[0])
+        self.assertNotIn("Routine inventory checks", passages[0])
+        self.assertLessEqual(len(passages[0]), 260)
+
 
 class McpDiscoveryTests(unittest.TestCase):
     def test_advertises_the_phase2_tools(self):
