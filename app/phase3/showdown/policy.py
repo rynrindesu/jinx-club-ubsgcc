@@ -92,6 +92,29 @@ class HighVariancePolicy:
         candidates = self._candidates(request, responders)
         remaining_hands = max(0, request.total_hands - request.hand_number)
         base_metrics = metrics_for(player.seat for player in opponents)
+        # Learned action ranges improve sizing, but sparse buckets can become
+        # falsely certain. Safety gates use the worse of learned and uniform
+        # ranges so a merely plausible read cannot authorize a stack-sized
+        # call or wager with a hand that is broadly vulnerable under the rule.
+        uniform_ranges = {
+            player.seat: [1.0 / 13.0] * 13 for player in opponents
+        }
+        uniform_metrics = showdown_metrics_by_subset(
+            request.your_number,
+            request.community_number,
+            uniform_ranges,
+            rule_model,
+        )[frozenset(uniform_ranges)]
+        safety_share = min(
+            base_metrics.expected_share, uniform_metrics.expected_share
+        )
+        safety_sole_win = min(
+            base_metrics.sole_win_probability,
+            uniform_metrics.sole_win_probability,
+        )
+        safety_loss = max(
+            base_metrics.loss_probability, uniform_metrics.loss_probability
+        )
         confidence = float(rule_model.confidence())
         scouting = (
             request.hand_number <= self.config.scout_hands
@@ -140,16 +163,16 @@ class HighVariancePolicy:
             )
             pot_odds = call_cost / max(1, request.pot + call_cost)
             low_loss_edge = (
-                base_metrics.expected_share >= pot_odds + 0.04
-                and base_metrics.loss_probability <= 0.12
+                safety_share >= pot_odds + 0.04
+                and safety_loss <= 0.12
             )
             unbeatable_edge = (
-                base_metrics.expected_share >= pot_odds + 0.02
-                and base_metrics.loss_probability <= 0.01
+                safety_share >= pot_odds + 0.02
+                and safety_loss <= 0.01
             )
             call_is_robust = (
-                base_metrics.expected_share >= max(0.58, pot_odds + 0.10)
-                and base_metrics.sole_win_probability >= 0.45
+                safety_share >= max(0.58, pot_odds + 0.10)
+                and safety_sole_win >= 0.45
             ) or low_loss_edge
             # Repeated individually-small calls were still able to commit most
             # of a stack (189 chips before the reveal in the third replay).
@@ -157,15 +180,15 @@ class HighVariancePolicy:
             # genuine multiway sole-win edge rather than evaluating only the
             # latest increment.
             cumulative_call_is_robust = (
-                base_metrics.expected_share >= max(0.70, pot_odds + 0.10)
-                and base_metrics.sole_win_probability >= 0.62
+                safety_share >= max(0.70, pot_odds + 0.10)
+                and safety_sole_win >= 0.62
             ) or low_loss_edge
             # Do not burn a large prior commitment by folding when the all-in
             # price is excellent and almost all non-win mass is ties. The
             # low-loss requirement still rejects the replayed loose stack calls.
             all_in_is_robust = (
-                base_metrics.expected_share >= max(0.72, pot_odds + 0.12)
-                and base_metrics.sole_win_probability >= 0.72
+                safety_share >= max(0.72, pot_odds + 0.12)
+                and safety_sole_win >= 0.72
             ) or low_loss_edge or unbeatable_edge
             if (exposure >= 0.25 and not call_is_robust) or (
                 cumulative_exposure >= 0.25 and not cumulative_call_is_robust
@@ -236,8 +259,8 @@ class HighVariancePolicy:
         if not desperate and not (
             confidence >= self.config.scout_confidence
             and (
-                base_metrics.sole_win_probability >= 0.80
-                or base_metrics.loss_probability <= 0.01
+                safety_sole_win >= 0.80
+                or safety_loss <= 0.01
             )
         ):
             candidates = [

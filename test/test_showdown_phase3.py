@@ -799,6 +799,43 @@ class SimulatorFoundationTests(unittest.TestCase):
 
         self.assertEqual(strategy(raw), {"action": "call"})
 
+    def test_uniform_safety_gate_blocks_overconfident_full_stack_bet(self) -> None:
+        strategy = make_phase3_policy_strategy(seed_path=SEED_PATH)
+        players = [
+            player(0, stack=237, delta=41),
+            player(1, stack=0, delta=-200, folded=True, busted=True),
+            player(2, stack=612, delta=416),
+            player(3, stack=0, delta=-200, folded=True, busted=True),
+            player(4, stack=342, delta=143, folded=True),
+            player(5, stack=0, delta=-200, folded=True, busted=True),
+        ]
+        raw = payload(
+            match_id="standard-overconfident-range",
+            table_rule="verdigris",
+            hand_number=32,
+            round="post_reveal",
+            your_number=8,
+            community_number=1,
+            your_stack=237,
+            button_seat=2,
+            pot=9,
+            to_call=0,
+            min_raise_to=2,
+            max_raise_to=237,
+            legal_actions=["check", "bet"],
+            players=players,
+            current_hand_actions=[
+                {"round": "pre_reveal", "seat": 2, "action": "call", "amount": 2},
+                {"round": "pre_reveal", "seat": 4, "action": "fold"},
+                {"round": "pre_reveal", "seat": 0, "action": "raise", "amount": 4},
+                {"round": "pre_reveal", "seat": 2, "action": "call", "amount": 4},
+            ],
+        )
+
+        result = strategy(raw)
+        self.assertEqual(result["action"], "bet")
+        self.assertLess(result["amount"], 237)
+
     def test_positive_second_place_is_not_mistaken_for_a_safe_lead(self) -> None:
         strategy = make_phase3_policy_strategy(
             knowledge=locked_rule_knowledge("cinnabar", "standard")
