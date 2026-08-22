@@ -52,6 +52,13 @@ from app.showdown import decide_move as dispatch_move
 
 
 NAMES = ("you", "Dana", "Miles", "Theo", "Rhea", "Bram")
+SEED_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "app"
+    / "phase3"
+    / "showdown"
+    / "knowledge.seed.json"
+)
 
 
 def player(
@@ -412,14 +419,7 @@ class LearningTests(unittest.TestCase):
 
 class ReplayTests(unittest.TestCase):
     def test_shipped_seed_has_verified_rule_mappings_and_identity(self) -> None:
-        seed_path = (
-            Path(__file__).resolve().parents[1]
-            / "app"
-            / "phase3"
-            / "showdown"
-            / "knowledge.seed.json"
-        )
-        knowledge = load_seed(seed_path)
+        knowledge = load_seed(SEED_PATH)
         expected = {
             "verdigris": "standard",
             "cinnabar": "standard",
@@ -439,7 +439,7 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual(identity["seed_rules"], expected)
         self.assertEqual(
             identity["seed_sha256"],
-            hashlib.sha256(seed_path.read_bytes()).hexdigest(),
+            hashlib.sha256(SEED_PATH.read_bytes()).hexdigest(),
         )
 
     def test_replay_fit_and_duplicate_source_hash(self) -> None:
@@ -761,6 +761,43 @@ class SimulatorFoundationTests(unittest.TestCase):
         )
         self.assertEqual(strategy(losing_pair_all_in), {"action": "fold"})
         self.assertEqual(knowledge.to_dict(), before)
+
+    def test_seeded_policy_calls_low_loss_all_in_after_large_commitment(self) -> None:
+        strategy = make_phase3_policy_strategy(seed_path=SEED_PATH)
+        players = [
+            player(0, stack=86, bet=114),
+            player(1, folded=True),
+            player(2, stack=0, bet=250, delta=50, all_in=True),
+            player(3, folded=True),
+            player(4, stack=0, bet=200, all_in=True),
+            player(5, stack=0, bet=114, all_in=True),
+        ]
+        actions = [
+            {"round": "pre_reveal", "seat": 5, "action": "raise", "amount": 47},
+            {"round": "pre_reveal", "seat": 0, "action": "call", "amount": 47},
+            {"round": "pre_reveal", "seat": 2, "action": "raise", "amount": 82},
+            {"round": "pre_reveal", "seat": 4, "action": "call", "amount": 82},
+            {"round": "pre_reveal", "seat": 5, "action": "raise", "amount": 114},
+            {"round": "pre_reveal", "seat": 0, "action": "call", "amount": 114},
+            {"round": "pre_reveal", "seat": 2, "action": "raise", "amount": 250},
+            {"round": "pre_reveal", "seat": 4, "action": "call", "amount": 200},
+        ]
+        raw = payload(
+            match_id="obsidian-low-loss-all-in",
+            table_rule="obsidian",
+            hand_number=3,
+            your_number=1,
+            your_stack=86,
+            pot=679,
+            to_call=86,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+            players=players,
+            current_hand_actions=actions,
+        )
+
+        self.assertEqual(strategy(raw), {"action": "call"})
 
     def test_positive_second_place_is_not_mistaken_for_a_safe_lead(self) -> None:
         strategy = make_phase3_policy_strategy(

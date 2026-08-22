@@ -160,10 +160,13 @@ class HighVariancePolicy:
                 base_metrics.expected_share >= max(0.70, pot_odds + 0.10)
                 and base_metrics.sole_win_probability >= 0.62
             ) or low_loss_edge
+            # Do not burn a large prior commitment by folding when the all-in
+            # price is excellent and almost all non-win mass is ties. The
+            # low-loss requirement still rejects the replayed loose stack calls.
             all_in_is_robust = (
                 base_metrics.expected_share >= max(0.72, pot_odds + 0.12)
                 and base_metrics.sole_win_probability >= 0.72
-            ) or unbeatable_edge
+            ) or low_loss_edge or unbeatable_edge
             if (exposure >= 0.25 and not call_is_robust) or (
                 cumulative_exposure >= 0.25 and not cumulative_call_is_robust
             ) or (
