@@ -206,6 +206,18 @@ class RuleInferenceTests(unittest.TestCase):
         self.assertLess(high_estimate.mean, 0.20)
         self.assertGreater(low_estimate.mean, 0.80)
 
+    def test_equity_accepts_an_opponent_number_distribution(self):
+        state = Phase2State()
+        knowledge = teach_candidate(state, "range-rule", "higher")
+
+        uniform = knowledge.estimate(7, 5)
+        weak_only = knowledge.estimate(7, 5, opponent_range=[1] + [0] * 12)
+        strong_only = knowledge.estimate(7, 5, opponent_range=[0] * 12 + [1])
+
+        self.assertAlmostEqual(uniform.mean, 0.5)
+        self.assertEqual(weak_only.mean, 1.0)
+        self.assertEqual(strong_only.mean, 0.0)
+
     def test_pairwise_fallback_uses_transitive_results(self):
         knowledge = RuleKnowledge(())
         knowledge.ingest(
@@ -246,6 +258,59 @@ class RuleInferenceTests(unittest.TestCase):
         estimate = knowledge.estimate(3, 5)
 
         self.assertAlmostEqual(estimate.lower, 0.5 / 13)
+
+    def test_folded_hand_never_creates_showdown_rule_evidence(self):
+        state = Phase2State()
+        request = phase2_request(table_rule="fold-rule")
+        request["recent_hands"] = [
+            completed_hand(
+                1,
+                13,
+                1,
+                7,
+                1,
+                actions=[
+                    {
+                        "round": "post_reveal",
+                        "seat": 1,
+                        "action": "fold",
+                    }
+                ],
+            )
+        ]
+
+        knowledge, _ = state.observe_payload(request)
+
+        self.assertEqual(knowledge.observation_count, 0)
+
+    def test_distinct_number_tie_is_recorded_as_rule_evidence(self):
+        state = Phase2State()
+        request = phase2_request(table_rule="tie-rule")
+        request["recent_hands"] = [completed_hand(1, 4, 9, 7, 0)]
+
+        knowledge, _ = state.observe_payload(request)
+
+        self.assertEqual(knowledge.observation_count, 1)
+        self.assertEqual(knowledge.direct_results[(7, 4, 9)], 0)
+        self.assertIn(7, knowledge.tied_communities)
+
+    def test_contradiction_downgrades_a_learned_rule(self):
+        state = Phase2State()
+        knowledge = teach_candidate(state, "contradiction-rule", "lower")
+        self.assertEqual(knowledge.estimate(3, 5).confidence, "learned")
+
+        knowledge.ingest(
+            ShowdownObservation(
+                key=("contradiction", 1, "0", "1"),
+                community=5,
+                first_number=3,
+                second_number=2,
+                outcome=1,
+            )
+        )
+
+        self.assertEqual(knowledge.estimate(3, 5).confidence, "partial")
+        self.assertEqual(knowledge.active_candidates, set())
 
 
 class Phase2PolicyTests(unittest.TestCase):
@@ -299,6 +364,35 @@ class Phase2PolicyTests(unittest.TestCase):
 
         self.assertEqual(Phase2Engine().decide(request), {"action": "call"})
 
+    def test_unknown_rule_occasionally_probes_a_four_chip_raise(self):
+        request = phase2_request(7, match_id="probe-16")
+        request.update(
+            your_stack=198,
+            pot=8,
+            to_call=4,
+            min_raise_to=12,
+            max_raise_to=198,
+            legal_actions=["fold", "call", "raise"],
+            current_hand_actions=[
+                {
+                    "round": "pre_reveal",
+                    "seat": 0,
+                    "action": "call",
+                    "amount": 2,
+                },
+                {
+                    "round": "pre_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 6,
+                },
+            ],
+        )
+        request["players"][0].update(stack=198, bet_this_round=2)
+        request["players"][1].update(bet_this_round=6)
+
+        self.assertEqual(Phase2Engine().decide(request), {"action": "call"})
+
     def test_learned_codenames_produce_different_moves_for_same_numbers(self):
         state = Phase2State()
         teach_candidate(state, "high-rule", "pair_then_higher")
@@ -314,6 +408,81 @@ class Phase2PolicyTests(unittest.TestCase):
 
         self.assertEqual(high_move, {"action": "fold"})
         self.assertEqual(low_move, {"action": "call"})
+
+    def test_learned_rule_opens_a_profitable_button_range(self):
+        state = Phase2State()
+        teach_candidate(state, "open-rule", "higher")
+
+        move = Phase2Engine(state).decide(
+            phase2_request(6, table_rule="open-rule")
+        )
+
+        self.assertEqual(move, {"action": "raise", "amount": 4})
+
+    def test_calling_station_receives_more_post_reveal_value_bets(self):
+        state = Phase2State()
+        teach_candidate(state, "station-rule", "lower")
+        responses = []
+        for hand_number in range(1, 5):
+            responses.append(
+                completed_hand(
+                    hand_number,
+                    7,
+                    7,
+                    10,
+                    0,
+                    actions=[
+                        {
+                            "round": "pre_reveal",
+                            "seat": 0,
+                            "action": "call",
+                            "amount": 2,
+                        },
+                        {
+                            "round": "pre_reveal",
+                            "seat": 1,
+                            "action": "check",
+                        },
+                        {
+                            "round": "post_reveal",
+                            "seat": 0,
+                            "action": "bet",
+                            "amount": 2,
+                        },
+                        {
+                            "round": "post_reveal",
+                            "seat": 1,
+                            "action": "call",
+                            "amount": 2,
+                        },
+                    ],
+                )
+            )
+        request = phase2_request(
+            6,
+            table_rule="station-rule",
+            hand_number=5,
+        )
+        request.update(
+            round="post_reveal",
+            community_number=10,
+            pot=6,
+            to_call=0,
+            min_raise_to=2,
+            max_raise_to=199,
+            legal_actions=["check", "bet"],
+            current_hand_actions=[
+                {"round": "post_reveal", "seat": 1, "action": "check"}
+            ],
+            recent_hands=responses,
+        )
+        request["players"][0].update(bet_this_round=0)
+        request["players"][1].update(bet_this_round=0)
+
+        self.assertEqual(
+            Phase2Engine(state).decide(request),
+            {"action": "bet", "amount": 4},
+        )
 
     def test_learned_top_hand_can_call_for_its_entire_stack(self):
         state = Phase2State()
@@ -540,7 +709,7 @@ class Phase2PolicyTests(unittest.TestCase):
         self.assertEqual(engine.decide(raised_post(4, 12)), {"action": "fold"})
         self.assertEqual(engine.decide(raised_post(3, 10)), {"action": "call"})
 
-    def test_thirty_chip_cushion_refuses_a_marginal_four_bet(self):
+    def test_early_thirty_chip_result_stays_active_but_late_cushion_protects(self):
         state = Phase2State()
         teach_candidate(state, "protected-low-rule", "lower")
         engine = Phase2Engine(state)
@@ -586,7 +755,11 @@ class Phase2PolicyTests(unittest.TestCase):
             chip_delta=-33, stack=212, bet_this_round=21
         )
 
-        self.assertEqual(engine.decide(request), {"action": "fold"})
+        self.assertEqual(engine.decide(request), {"action": "call"})
+
+        late = copy.deepcopy(request)
+        late["hand_number"] = 30
+        self.assertEqual(engine.decide(late), {"action": "fold"})
 
     def test_desperate_partial_consensus_uses_half_pot_not_three_quarters(self):
         state = Phase2State()
@@ -741,6 +914,79 @@ class StateScopeTests(unittest.TestCase):
         retry = phase2_request(match_id="attempt-b-leg-1")
         _, retry_profile = state.observe_payload(retry)
         self.assertEqual(retry_profile.open_responses, 0)
+
+    def test_revealed_actions_condition_range_after_six_shown_hands(self):
+        state = Phase2State()
+        knowledge = teach_candidate(state, "behavior-rule", "lower")
+        hands = []
+        for hand_number in range(1, 7):
+            hand = completed_hand(
+                hand_number,
+                2,
+                1,
+                hand_number + 1,
+                -1,
+                actions=[
+                    {
+                        "round": "pre_reveal",
+                        "seat": 1,
+                        "action": "raise",
+                        "amount": 6,
+                    },
+                    {
+                        "round": "pre_reveal",
+                        "seat": 0,
+                        "action": "call",
+                        "amount": 6,
+                    },
+                ],
+            )
+            hand["button_seat"] = 1
+            hand["pot"] = 10
+            hands.append(hand)
+
+        request = phase2_request(
+            4,
+            table_rule="behavior-rule",
+            hand_number=7,
+        )
+        request.update(
+            button_seat=1,
+            pot=9,
+            to_call=4,
+            current_hand_actions=[
+                {
+                    "round": "pre_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 6,
+                }
+            ],
+            recent_hands=hands[:5],
+        )
+        _, early_profile = state.observe_payload(request)
+        early_range = early_profile.range_for(
+            payload=request,
+            rule_knowledge=knowledge,
+        )
+        self.assertTrue(all(abs(weight - 1 / 13) < 1e-12 for weight in early_range))
+
+        request["recent_hands"] = hands
+        _, learned_profile = state.observe_payload(request)
+        opponent_range = learned_profile.range_for(
+            payload=request,
+            rule_knowledge=knowledge,
+        )
+        uniform_equity = knowledge.estimate(4, None).mean
+        conditioned_equity = knowledge.estimate(
+            4,
+            None,
+            opponent_range=opponent_range,
+        ).mean
+
+        self.assertAlmostEqual(sum(opponent_range), 1.0)
+        self.assertGreater(opponent_range[0], 2 * opponent_range[-1])
+        self.assertLess(conditioned_equity, uniform_equity - 0.15)
 
     def test_three_bet_response_is_not_counted_as_fold_to_open(self):
         state = Phase2State()

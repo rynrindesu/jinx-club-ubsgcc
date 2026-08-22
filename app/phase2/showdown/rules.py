@@ -420,6 +420,14 @@ def extract_observations(
     for hand in hands:
         if not isinstance(hand, Mapping):
             continue
+        actions = hand.get("actions")
+        if isinstance(actions, list) and any(
+            isinstance(action, Mapping) and action.get("action") == "fold"
+            for action in actions
+        ):
+            # A folded hand is not a showdown even if a replay happens to
+            # include private numbers for display or diagnostics.
+            continue
         hand_number = _integer(hand.get("hand_number"))
         community = _integer(hand.get("community_number"))
         shown = hand.get("shown_numbers")
