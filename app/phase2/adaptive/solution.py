@@ -88,6 +88,7 @@ def calculate_slo(
     )
 
     heartbeats_by_service: dict[str, list[dict[str, Any]]] = {}
+    seen_heartbeats: set[tuple[str, int | float, int | float, str]] = set()
     for index, heartbeat_value in enumerate(heartbeats):
         location = f"heartbeats[{index}]"
         heartbeat = _object(heartbeat_value, location)
@@ -101,6 +102,11 @@ def calculate_slo(
         if latency_ms < 0:
             raise PayloadValidationError(f"{location}.latencyMs must not be negative")
         status = _text(_required(heartbeat, "status", location), f"{location}.status")
+
+        heartbeat_identity = (service, timestamp, latency_ms, status)
+        if heartbeat_identity in seen_heartbeats:
+            continue
+        seen_heartbeats.add(heartbeat_identity)
 
         heartbeats_by_service.setdefault(service, []).append(
             {

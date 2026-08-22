@@ -167,7 +167,7 @@ class AdaptiveGatewayPhase2Tests(unittest.TestCase):
 
         self.assertEqual(result["sloOutput"], {"availability": 0.5, "p95LatencyMs": 100})
 
-    def test_duplicate_heartbeats_are_counted_as_observations(self):
+    def test_duplicate_heartbeats_are_ignored(self):
         self.body["heartbeats"].append(
             {
                 "service": "auth",
@@ -180,7 +180,7 @@ class AdaptiveGatewayPhase2Tests(unittest.TestCase):
         result = solve(encode_payload(self.body))
 
         self.assertEqual(
-            result["sloOutput"], {"availability": 1 / 3, "p95LatencyMs": 180}
+            result["sloOutput"], {"availability": 0.5, "p95LatencyMs": 180}
         )
 
     def test_p95_uses_nearest_rank_for_multiple_latencies(self):
