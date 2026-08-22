@@ -33,7 +33,7 @@ Phase 1 keeps its existing standard-rule policy. Phase 2 is isolated in
 - repeat-safe ingestion of the rolling `recent_hands` window;
 - a candidate-rule ensemble with a transitive pairwise fallback;
 - opponent tendencies carried across the four legs of one attempt; and
-- late-leg risk control for the per-leg `+25` target.
+- uncertainty, re-raise, and `+25`-cushion risk controls.
 
 Rule knowledge lives for the lifetime of the server process, so it carries
 across retries without mixing opponent profiles between attempts. The supplied
