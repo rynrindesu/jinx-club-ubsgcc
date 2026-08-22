@@ -10,6 +10,7 @@ point before returning to 2037.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
 from functools import cmp_to_key
 from typing import Any, Iterable
 
@@ -139,7 +140,7 @@ def _build_groups(
     result.sort(
         key=lambda group: (
             -max(
-                opportunity.profit / opportunity.buy_price
+                Fraction(opportunity.profit, opportunity.buy_price)
                 for opportunity in group[1]
             ),
             -sum(
@@ -258,7 +259,7 @@ def _candidate_transitions(
     by_efficiency = sorted(
         transitions,
         key=lambda item: (
-            -(item.gain / max(1, item.travel)),
+            -Fraction(item.gain, max(1, item.travel)),
             -item.gain,
             item.travel,
         ),
@@ -287,7 +288,9 @@ def _apply_transition(state: _State, transition: _Transition) -> _State:
     if state.year != transition.buy_year:
         actions.append(f"j-{state.year}-{transition.buy_year}")
     for opportunity, quantity in transition.purchases:
-        remaining[opportunity.listing_index] -= quantity
+        # A quote is a single-use lot: making any purchase permanently removes
+        # that (year, stock) opportunity, including shares we could not afford.
+        remaining[opportunity.listing_index] = 0
         actions.append(f"b-{opportunity.stock}-{quantity}")
 
     actions.append(f"j-{transition.buy_year}-{transition.sell_year}")

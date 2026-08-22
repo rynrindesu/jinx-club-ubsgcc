@@ -346,6 +346,135 @@ class Phase2PolicyRegressionTests(unittest.TestCase):
             {"action": "call"},
         )
 
+    def test_exact_learned_hand_takes_only_cheap_bet_raise_closing_price(self):
+        request = phase2_request(
+            13,
+            table_rule="replay-leg-one",
+            leg_number=1,
+            hand_number=30,
+            delta=-7,
+        )
+        request.update(
+            round="post_reveal",
+            community_number=10,
+            button_seat=1,
+            your_stack=183,
+            pot=36,
+            to_call=16,
+            min_raise_to=37,
+            max_raise_to=188,
+            legal_actions=["fold", "call", "raise"],
+            current_hand_actions=[
+                {
+                    "round": "pre_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 5,
+                },
+                {
+                    "round": "pre_reveal",
+                    "seat": 0,
+                    "action": "call",
+                    "amount": 5,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 0,
+                    "action": "bet",
+                    "amount": 5,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 21,
+                },
+            ],
+        )
+        request["players"][0].update(
+            chip_delta=-7,
+            stack=183,
+            bet_this_round=5,
+        )
+        request["players"][1].update(
+            chip_delta=7,
+            stack=181,
+            bet_this_round=21,
+        )
+        risk = _risk_context(request)
+
+        self.assertEqual(
+            _post_reveal_move(
+                request,
+                learned_equity(0.75),
+                neutral_profile(),
+                risk,
+            ),
+            {"action": "call"},
+        )
+        self.assertEqual(
+            _post_reveal_move(
+                request,
+                learned_equity(0.71),
+                neutral_profile(),
+                risk,
+            ),
+            {"action": "fold"},
+        )
+        ambiguous = replace(learned_equity(0.75), candidate_count=2)
+        self.assertEqual(
+            _post_reveal_move(request, ambiguous, neutral_profile(), risk),
+            {"action": "fold"},
+        )
+
+        expensive = copy.deepcopy(request)
+        expensive.update(pot=50, to_call=30, min_raise_to=66)
+        expensive["current_hand_actions"][-1]["amount"] = 35
+        expensive["players"][1].update(stack=167, bet_this_round=35)
+        self.assertEqual(
+            _post_reveal_move(
+                expensive,
+                learned_equity(0.75),
+                neutral_profile(),
+                _risk_context(expensive),
+            ),
+            {"action": "fold"},
+        )
+
+        raise_war = copy.deepcopy(request)
+        raise_war.update(pot=60, to_call=26, min_raise_to=65)
+        raise_war["current_hand_actions"][2:] = [
+            {
+                "round": "post_reveal",
+                "seat": 1,
+                "action": "bet",
+                "amount": 5,
+            },
+            {
+                "round": "post_reveal",
+                "seat": 0,
+                "action": "raise",
+                "amount": 12,
+            },
+            {
+                "round": "post_reveal",
+                "seat": 1,
+                "action": "raise",
+                "amount": 38,
+            },
+        ]
+        raise_war["players"][0].update(stack=176, bet_this_round=12)
+        raise_war["players"][1].update(stack=164, bet_this_round=38)
+        self.assertEqual(
+            _post_reveal_move(
+                raise_war,
+                learned_equity(0.75),
+                neutral_profile(),
+                _risk_context(raise_war),
+            ),
+            {"action": "fold"},
+        )
+
     def test_replay_closing_all_ins_are_called_after_value_wager(self):
         leg_four_hand_one = phase2_request(
             1,

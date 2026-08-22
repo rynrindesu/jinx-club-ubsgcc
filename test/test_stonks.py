@@ -1,8 +1,5 @@
 import unittest
 
-from fastapi.testclient import TestClient
-
-from app.main import app
 from app.phase04.stonks import solve_case
 
 
@@ -39,7 +36,7 @@ class StonksTests(unittest.TestCase):
 
         self.assertEqual(solve_case(case)[-1], "s-A-10")
 
-    def test_inventory_does_not_reset_between_trips(self):
+    def test_buying_once_consumes_the_entire_year_stock_lot(self):
         case = {
             "energy": 6,
             "capital": 10,
@@ -51,13 +48,8 @@ class StonksTests(unittest.TestCase):
 
         actions = solve_case(case)
 
-        bought = sum(
-            int(action.rsplit("-", 1)[1])
-            for action in actions
-            if action.startswith("b-A-")
-        )
-        self.assertEqual(bought, 4)
-        self.assertNotIn("b-A-4", actions)
+        buys = [action for action in actions if action.startswith("b-A-")]
+        self.assertEqual(buys, ["b-A-1"])
 
     def test_no_profitable_trade_returns_empty_actions(self):
         case = {
@@ -70,34 +62,6 @@ class StonksTests(unittest.TestCase):
         }
 
         self.assertEqual(solve_case(case), [])
-
-    def test_endpoint_accepts_root_array(self):
-        client = TestClient(app)
-        response = client.post(
-            "/stonks",
-            json=[
-                {
-                    "energy": 2,
-                    "capital": 500,
-                    "timeline": {
-                        "2037": {"Apple": {"price": 100, "qty": 10}},
-                        "2036": {"Apple": {"price": 10, "qty": 50}},
-                    },
-                }
-            ],
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            [[
-                "j-2037-2036",
-                "b-Apple-50",
-                "j-2036-2037",
-                "s-Apple-50",
-            ]],
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -302,13 +302,26 @@ def _post_reveal_move(
     if to_call > 0:
         pot_odds = to_call / max(1, pot + to_call)
         fresh_fraction = to_call / max(1, pot - to_call)
+        wagered_this_round = _we_wagered_this_round(payload)
         required = pot_odds + 0.03 + call_adjustment
         if fresh_fraction > 1.0:
             required = max(required, 0.72)
-        if _we_wagered_this_round(payload):
+        if wagered_this_round:
+            reopen_floor = 0.78
+            if (
+                pot_odds <= 0.35
+                and estimate.confidence == "learned"
+                and estimate.candidate_count == 1
+                and risk.tier in {"normal", "press", "chase"}
+                and _we_bet_without_raising_this_round(payload)
+            ):
+                # Once the rule is exactly identified, take a favorable
+                # closing price with a strong hand.  Keep the stricter floor
+                # for expensive calls, protected leads, and raise wars.
+                reopen_floor = 0.72
             required = max(
                 required,
-                0.78,
+                reopen_floor,
                 risk.continuation_floor,
             )
 
@@ -327,7 +340,7 @@ def _post_reveal_move(
         # escalating into a raise war and later folding the closing price.
         if (
             conservative >= required
-            and not _we_wagered_this_round(payload)
+            and not wagered_this_round
             and "raise" in _legal_actions(payload)
             and conservative >= 0.89
             and estimate.confidence == "learned"
@@ -755,6 +768,19 @@ def _we_wagered_this_round(payload: Mapping[str, Any]) -> bool:
         and action.get("action") in {"bet", "raise"}
         for action in _round_actions(payload)
     )
+
+
+def _we_bet_without_raising_this_round(payload: Mapping[str, Any]) -> bool:
+    """True only for a single hero bet that the opponent has reopened."""
+
+    your_seat = payload.get("your_seat")
+    hero_wagers = [
+        action.get("action")
+        for action in _round_actions(payload)
+        if str(action.get("seat")) == str(your_seat)
+        and action.get("action") in {"bet", "raise"}
+    ]
+    return hero_wagers == ["bet"]
 
 
 def _latest_opponent_raise_total(payload: Mapping[str, Any]) -> int | None:

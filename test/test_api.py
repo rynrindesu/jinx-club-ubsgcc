@@ -34,6 +34,32 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(response.json()["action"], request["legal_actions"])
 
+    def test_stonks_endpoint_accepts_root_array(self):
+        response = self.client.post(
+            "/stonks",
+            json=[
+                {
+                    "energy": 2,
+                    "capital": 500,
+                    "timeline": {
+                        "2037": {"Apple": {"price": 100, "qty": 10}},
+                        "2036": {"Apple": {"price": 10, "qty": 50}},
+                    },
+                }
+            ],
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            [[
+                "j-2037-2036",
+                "b-Apple-50",
+                "j-2036-2037",
+                "s-Apple-50",
+            ]],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
