@@ -106,6 +106,10 @@ def _facing_bet(
 ) -> Action:
     legal = _legal_actions(payload)
     pot_odds = to_call / max(1, pot + to_call)
+    post_reveal = payload.get("round") == "post_reveal"
+    your_number = _integer(payload.get("your_number"), 7)
+    chip_delta = _your_chip_delta(payload)
+    lower_range = your_number <= 7
 
     # A larger fraction of the remaining stack needs a clearer edge.  Highly
     # aggressive opponents receive a modest bluff allowance, shrunk by priors
@@ -116,6 +120,12 @@ def _facing_bet(
     repeated_pressure = max(0, _opponent_pressure_count(payload) - 1) * 0.02
     call_threshold = pot_odds + risk_premium + round_margin + repeated_pressure
     call_threshold -= aggression_adjustment
+    if chip_delta <= -20:
+        call_threshold += 0.02
+    if lower_range and chip_delta <= -20:
+        call_threshold += 0.02
+    if chip_delta <= -50:
+        call_threshold += 0.02
 
     # A pair cannot lose at a standard showdown; occasionally calling instead
     # of raising prevents the strongest hand from being completely transparent.
@@ -124,13 +134,58 @@ def _facing_bet(
             "raise" in legal
             and ("call" not in legal or _roll(payload, "pair-trap") >= 0.20)
         ):
-            return _wager(payload, "raise", pot_fraction=0.75)
+            return _wager(payload, "raise", pot_fraction=0.75, allow_all_in=True)
         if "call" in legal:
             return {"action": "call"}
         return {"action": "raise"}
 
+    call_fraction = to_call / stack
+
+    # Only a pair may voluntarily risk the whole stack.  This applies before
+    # the reveal too: a high number is strong, but it is not unbeatable.
+    if to_call >= stack and "fold" in legal:
+        return {"action": "fold"}
+
+    # Stop chasing large prices with the bottom half of the range while the
+    # match is already negative.  Use to_call, the actual incremental cost,
+    # rather than the opponent's logged round-total amount.
+    if lower_range and chip_delta <= -20 and to_call > 20 and "fold" in legal:
+        return {"action": "fold"}
+    if (
+        post_reveal
+        and lower_range
+        and chip_delta <= -40
+        and to_call >= 10
+        and "fold" in legal
+    ):
+        return {"action": "fold"}
+
+    # A post-reveal re-raise is much stronger evidence than an ordinary bet.
+    # Raw equity assumes every opponent number is equally likely, but after we
+    # raise and the opponent raises again their range is heavily concentrated
+    # on the community number (a pair).  Never risk a substantial part of the
+    # stack with a non-pair in that line.  Only a proven extreme aggressor gets
+    # called when the additional price is very small.
+    if (
+        post_reveal
+        and _facing_reraise(payload)
+        and "fold" in legal
+        and (call_fraction > 0.15 or profile.aggression < 0.68)
+    ):
+        return {"action": "fold"}
+
+    # The match score has a hard -200 bust outcome.  An unknown opponent's
+    # large post-reveal shove is not a spot to stack off with a non-pair, even
+    # when a high number has excellent unconditional showdown equity.
+    if post_reveal and call_fraction >= 0.45 and "fold" in legal:
+        return {"action": "fold"}
+
     has_calling_edge = equity >= call_threshold
-    value_raise = equity >= 0.76 and equity >= call_threshold + 0.10
+    value_raise = (
+        not post_reveal
+        and equity >= 0.76
+        and equity >= call_threshold + 0.10
+    )
     if (
         value_raise
         and "raise" in legal
@@ -181,7 +236,12 @@ def _when_free_to_continue(
     if is_pair:
         if "check" in legal and _roll(payload, "pair-open-trap") < 0.15:
             return {"action": "check"}
-        return _wager(payload, wager_action, pot_fraction=0.70)
+        return _wager(
+            payload,
+            wager_action,
+            pot_fraction=0.70,
+            allow_all_in=True,
+        )
 
     value_threshold = 0.62 if checked_to_us or in_position_post_reveal else 0.68
     if (
@@ -205,7 +265,13 @@ def _when_free_to_continue(
     return {"action": "check"}
 
 
-def _wager(payload: Mapping[str, Any], action: str, pot_fraction: float) -> Action:
+def _wager(
+    payload: Mapping[str, Any],
+    action: str,
+    pot_fraction: float,
+    *,
+    allow_all_in: bool = False,
+) -> Action:
     minimum = _optional_integer(payload.get("min_raise_to"))
     maximum = _optional_integer(payload.get("max_raise_to"))
     if minimum is None or maximum is None or minimum > maximum:
@@ -214,6 +280,19 @@ def _wager(payload: Mapping[str, Any], action: str, pot_fraction: float) -> Acti
     contribution = _your_round_contribution(payload)
     to_call = max(0, _integer(payload.get("to_call"), 0))
     pot = max(1, _integer(payload.get("pot"), 1))
+    stack = max(1, _integer(payload.get("your_stack"), 1))
+
+    if not allow_all_in:
+        non_all_in_maximum = contribution + stack - 1
+        maximum = min(maximum, non_all_in_maximum)
+        if maximum < minimum:
+            legal = _legal_actions(payload)
+            if "check" in legal:
+                return {"action": "check"}
+            if "call" in legal and to_call < stack:
+                return {"action": "call"}
+            if "fold" in legal:
+                return {"action": "fold"}
 
     if to_call:
         raise_extra = max(to_call, round(pot * pot_fraction))
@@ -327,6 +406,32 @@ def _opponent_pressure_count(payload: Mapping[str, Any]) -> int:
     )
 
 
+def _facing_reraise(payload: Mapping[str, Any]) -> bool:
+    """Whether the opponent just raised after our bet or raise this round."""
+
+    your_seat = payload.get("your_seat")
+    current_round = payload.get("round")
+    actions = payload.get("current_hand_actions")
+    if not isinstance(actions, list):
+        return False
+
+    round_actions = [
+        action
+        for action in actions
+        if isinstance(action, Mapping) and action.get("round") == current_round
+    ]
+    if len(round_actions) < 2:
+        return False
+
+    previous, latest = round_actions[-2:]
+    return (
+        previous.get("seat") == your_seat
+        and previous.get("action") in {"bet", "raise"}
+        and latest.get("seat") != your_seat
+        and latest.get("action") == "raise"
+    )
+
+
 def _opponent_checked_this_round(payload: Mapping[str, Any]) -> bool:
     your_seat = payload.get("your_seat")
     current_round = payload.get("round")
@@ -360,6 +465,18 @@ def _your_round_contribution(payload: Mapping[str, Any]) -> int:
         if isinstance(player, Mapping) and player.get("seat") == your_seat:
             return max(0, _integer(player.get("bet_this_round"), 0))
     return 0
+
+
+def _your_chip_delta(payload: Mapping[str, Any]) -> int:
+    your_seat = payload.get("your_seat")
+    players = payload.get("players")
+    if isinstance(players, list):
+        for player in players:
+            if isinstance(player, Mapping) and player.get("seat") == your_seat:
+                parsed = _optional_integer(player.get("chip_delta"))
+                if parsed is not None:
+                    return parsed
+    return _integer(payload.get("chip_delta"), 0)
 
 
 def _roll(payload: Mapping[str, Any], purpose: str) -> float:

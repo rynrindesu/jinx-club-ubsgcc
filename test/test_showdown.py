@@ -98,6 +98,153 @@ class DecisionTests(unittest.TestCase):
 
         self.assertEqual(decide_move(request), {"action": "call"})
 
+    def test_high_non_pair_calls_instead_of_value_raising_post_reveal(self):
+        request = sample_request()
+        request.update(
+            your_number=13,
+            community_number=11,
+            pot=45,
+            to_call=25,
+            min_raise_to=50,
+            max_raise_to=185,
+        )
+
+        self.assertEqual(decide_move(request), {"action": "call"})
+
+    def test_final_hand_non_pair_folds_to_all_in_reraise(self):
+        request = sample_request()
+        request.update(
+            match_id="phase1-final-hand",
+            hand_number=45,
+            total_hands=45,
+            your_number=13,
+            community_number=11,
+            your_stack=131,
+            pot=269,
+            to_call=131,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+            current_hand_actions=[
+                {"round": "pre_reveal", "seat": 0, "action": "call", "amount": 2},
+                {"round": "pre_reveal", "seat": 1, "action": "raise", "amount": 5},
+                {"round": "pre_reveal", "seat": 0, "action": "raise", "amount": 10},
+                {"round": "pre_reveal", "seat": 1, "action": "call", "amount": 10},
+                {"round": "post_reveal", "seat": 1, "action": "bet", "amount": 25},
+                {"round": "post_reveal", "seat": 0, "action": "raise", "amount": 54},
+                {"round": "post_reveal", "seat": 1, "action": "raise", "amount": 195},
+            ],
+        )
+        request["players"][0].update(bet_this_round=54, stack=131)
+        request["players"][1].update(bet_this_round=195, stack=0, all_in=True)
+
+        self.assertEqual(decide_move(request), {"action": "fold"})
+
+    def test_non_pair_never_calls_all_in(self):
+        request = sample_request()
+        request.update(
+            round="pre_reveal",
+            your_number=13,
+            community_number=None,
+            your_stack=50,
+            pot=100,
+            to_call=50,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+        )
+
+        self.assertEqual(decide_move(request), {"action": "fold"})
+
+    def test_twelve_against_community_thirteen_is_not_an_all_in_hand(self):
+        request = sample_request()
+        request.update(
+            your_number=12,
+            community_number=13,
+            your_stack=50,
+            pot=100,
+            to_call=50,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+        )
+
+        self.assertEqual(decide_move(request), {"action": "fold"})
+
+    def test_any_pair_can_call_all_in(self):
+        request = sample_request()
+        request.update(
+            your_number=2,
+            community_number=2,
+            your_stack=50,
+            pot=100,
+            to_call=50,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+        )
+
+        self.assertEqual(decide_move(request), {"action": "call"})
+
+    def test_low_non_pair_down_twenty_folds_cost_over_twenty(self):
+        request = sample_request()
+        request.update(
+            your_number=7,
+            community_number=10,
+            pot=100,
+            to_call=21,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+        )
+        request["players"][0]["chip_delta"] = -25
+
+        self.assertEqual(decide_move(request), {"action": "fold"})
+
+    def test_low_non_pair_down_forty_folds_medium_post_reveal_bet(self):
+        request = sample_request()
+        request.update(
+            your_number=6,
+            community_number=9,
+            pot=24,
+            to_call=12,
+            min_raise_to=24,
+            max_raise_to=149,
+            legal_actions=["fold", "call", "raise"],
+        )
+        request["players"][0]["chip_delta"] = -51
+
+        self.assertEqual(decide_move(request), {"action": "fold"})
+
+    def test_low_number_down_fifty_folds_small_pre_reveal_raise(self):
+        request = sample_request()
+        request.update(
+            round="pre_reveal",
+            your_number=6,
+            community_number=None,
+            your_stack=147,
+            pot=8,
+            to_call=4,
+            min_raise_to=10,
+            max_raise_to=149,
+            legal_actions=["fold", "call", "raise"],
+            current_hand_actions=[
+                {"round": "pre_reveal", "seat": 0, "action": "call", "amount": 2},
+                {"round": "pre_reveal", "seat": 1, "action": "raise", "amount": 6},
+            ],
+        )
+        request["players"][0].update(
+            chip_delta=-51,
+            bet_this_round=2,
+            stack=147,
+        )
+        request["players"][1].update(
+            chip_delta=51,
+            bet_this_round=6,
+        )
+
+        self.assertEqual(decide_move(request), {"action": "fold"})
+
     def test_free_weak_hand_checks(self):
         request = sample_request()
         request.update(
