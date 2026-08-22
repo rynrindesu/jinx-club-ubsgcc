@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import product
 import math
+import time
 from typing import Any, Iterable
 
-from .equity import showdown_share
+from .equity import showdown_shares_by_subset
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,7 @@ class PolicyConfig:
     scout_confidence: float = 0.90
     scout_call_budget: int = 15
     endgame_hands: int = 12
+    decision_budget_seconds: float = 0.45
     # Value is intentionally convex on positive outcomes: retries reward tail wins.
     positive_tail_weight: float = 0.045
     leader_margin_weight: float = 1.8
@@ -47,6 +49,7 @@ class HighVariancePolicy:
         self.config = config or PolicyConfig()
 
     def decide(self, request: Any, session: Any, knowledge: Any) -> dict[str, str | int]:
+        deadline = time.monotonic() + self.config.decision_budget_seconds
         rule_model = knowledge.get_rule(request.table_rule)
         opponents = [
             player
@@ -63,25 +66,41 @@ class HighVariancePolicy:
             )
             for player in opponents
         }
-        equity_cache: dict[frozenset[int], float] = {}
+        range_strengths = {
+            player.seat: self._range_strength(
+                ranges[player.seat], request.community_number, rule_model
+            )
+            for player in opponents
+        }
+        equity_cache = showdown_shares_by_subset(
+            request.your_number,
+            request.community_number,
+            ranges,
+            rule_model,
+        )
 
         def equity_for(seats: Iterable[int]) -> float:
             key = frozenset(seats)
-            if key not in equity_cache:
-                equity_cache[key] = showdown_share(
-                    request.your_number,
-                    request.community_number,
-                    [ranges[seat] for seat in sorted(key)],
-                    rule_model,
-                )
-            return equity_cache[key]
+            return equity_cache.get(key, 1.0 if not key else 0.0)
 
         candidates = self._candidates(request, responders)
+        if (
+            request.hand_number <= self.config.scout_hands
+            and rule_model.confidence() < self.config.scout_confidence
+            and equity_for(player.seat for player in opponents) < 0.75
+        ):
+            candidates = [
+                candidate
+                for candidate in candidates
+                if candidate.action not in {"bet", "raise"}
+            ]
         if not candidates:
             return {"action": "check"}
 
         scores: list[tuple[float, int, int, Candidate]] = []
         for candidate in candidates:
+            if scores and time.monotonic() >= deadline:
+                break
             score = self._score(
                 request,
                 session,
@@ -90,6 +109,7 @@ class HighVariancePolicy:
                 opponents,
                 responders,
                 ranges,
+                range_strengths,
                 equity_for,
                 knowledge,
             )
@@ -150,6 +170,7 @@ class HighVariancePolicy:
         opponents: list[Any],
         responders: list[Any],
         ranges: dict[int, list[float]],
+        range_strengths: dict[int, float],
         equity_for: Any,
         knowledge: Any,
     ) -> float:
@@ -195,9 +216,7 @@ class HighVariancePolicy:
                 player.stack,
                 max(0, target - player.bet_this_round),
             )
-            strength = self._range_strength(
-                ranges[player.seat], request.community_number, rule_model
-            )
+            strength = range_strengths[player.seat]
             profile = knowledge.get_opponent(player.name)
             probability = self._continue_probability(
                 profile,
@@ -373,7 +392,10 @@ class HighVariancePolicy:
             if equity < pot_odds + 0.12:
                 adjustment -= 60.0
         if candidate.action in {"bet", "raise"} and equity < 0.75:
-            adjustment -= 30.0
+            # Scouting is intentionally controlled even though the post-scout
+            # strategy is high variance.  Do not burn the leg before learning
+            # what the codename makes strong.
+            adjustment -= 500.0 + 0.5 * investment
         return adjustment
 
     @staticmethod

@@ -12,15 +12,15 @@ the scorer measures its marginal increase in bounded discounted routes:
 `K = A + alpha*A^2 + ... + alpha^(L-1)*A^L`
 
 The binary active topology is the primary signal, so timestamp order cannot
-erase a return path that the graph can support. It computes the bounded sparse
-matrix series directly, allowing repeated walks only up to `L`; this captures
-recurring-flow capacity without exponential path enumeration or identifier-
-dependent truncation. A smaller time-respecting layer rewards simple routes
-following increasing `(createdAt, arrival sequence)` keys and decays them
-smoothly by elapsed time. Pair capacity rewards distinct paths, exact
-reachability rewards genuine shortcuts even beyond `L`, and closed money
-routes carry extra weight. The ordinary value of a single direct edge is
-subtracted, so a
+erase a return path that the graph can support. A smaller time-respecting layer
+rewards routes following increasing `(createdAt, arrival sequence)` keys and
+decays them smoothly by elapsed time. Both layers use simple entity signatures,
+with one return to the starting entity allowed, so repeated laps cannot
+manufacture route multiplicity. Overlapping cycles are pooled independently of
+identifier spelling, pair capacity rewards distinct paths, shortest-path
+efficiency rewards genuine shortcuts, and closed money routes carry extra
+weight while decaying coherently by reciprocal hop count. The ordinary value
+of a single direct edge is subtracted, so a
 disconnected transfer scores zero. All non-closed evidence shares one cap
 before scores saturate into `[0, 1]`, preventing a large acyclic bridge from
 outweighing a return loop. Phase 1 deliberately ignores amount, IP, and device

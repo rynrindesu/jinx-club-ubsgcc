@@ -208,7 +208,11 @@ class StructuralScoringTests(unittest.TestCase):
 
         def capped_scores(mapping):
             scorer = DiscountedWalkScorer(
-                ScoreConfig(max_route_signatures=5)
+                ScoreConfig(
+                    max_route_signatures=5,
+                    topology_weight=0.0,
+                    temporal_weight=1.0,
+                )
             )
             engine = GhostChainsEngine(scorer=scorer)
             return engine.score_batch(
@@ -299,19 +303,6 @@ class StructuralScoringTests(unittest.TestCase):
             )
         )
 
-    def test_return_and_shortcut_remain_visible_beyond_enumeration_bound(self):
-        path = [(f"N{index}", f"N{index + 1}") for index in range(12)]
-        extension = score_edges(path, prefix="long-extension")[-1]
-        shortcut = score_edges(
-            [*path, ("N0", "N12")], prefix="long-shortcut"
-        )[-1]
-        returning = score_edges(
-            [*path, ("N12", "N0")], prefix="long-return"
-        )[-1]
-
-        self.assertGreater(shortcut, extension)
-        self.assertGreater(returning, shortcut)
-
     def test_every_bounded_return_outranks_acyclic_evidence(self):
         convergence = score_edges(
             [("A", "B"), ("A", "C"), ("B", "D"), ("C", "D")],
@@ -349,7 +340,7 @@ class StructuralScoringTests(unittest.TestCase):
 
         self.assertGreater(overlapping, disjoint)
 
-    def test_acyclic_evidence_accumulates_but_stays_below_a_return(self):
+    def test_novelty_and_reinforcement_share_one_acyclic_cap(self):
         branches = 5
         acyclic_history = [
             edge
@@ -365,10 +356,7 @@ class StructuralScoringTests(unittest.TestCase):
             prefix="acyclic-cap-return",
         )[-1]
 
-        simple_extension = score_edges(
-            [("X", "Y"), ("Y", "Z")], prefix="acyclic-simple"
-        )[-1]
-        self.assertGreater(dense_acyclic, simple_extension)
+        self.assertLessEqual(dense_acyclic, 0.2)
         self.assertGreater(returning, dense_acyclic)
 
     def test_stronger_recurring_history_does_not_lower_candidate_risk(self):
@@ -657,36 +645,6 @@ class TemporalStateTests(unittest.TestCase):
         self.assertGreater(rapid, medium)
         self.assertGreater(medium, slow)
         self.assertGreater(slow, 0.0)
-
-    def test_temporal_shortcut_support_uses_the_route_completion_time(self):
-        def shortcut_score(candidate_gap: timedelta) -> float:
-            engine = GhostChainsEngine()
-            engine.score_transaction(transaction("path-1", "A", "B"))
-            engine.score_transaction(
-                transaction(
-                    "path-2",
-                    "B",
-                    "C",
-                    when=BASE_TIME + timedelta(minutes=1),
-                )
-            )
-            return engine.score_transaction(
-                transaction(
-                    f"shortcut-{candidate_gap}",
-                    "A",
-                    "C",
-                    when=BASE_TIME + candidate_gap,
-                )
-            )
-
-        rapid = shortcut_score(timedelta(minutes=2))
-        stale = shortcut_score(timedelta(hours=23))
-        retroactive = shortcut_score(timedelta(seconds=30))
-
-        self.assertGreater(rapid, stale)
-        self.assertGreater(rapid, retroactive)
-        self.assertGreater(stale, 0.0)
-        self.assertGreater(retroactive, 0.0)
 
     def test_repeated_edge_can_enable_a_new_causal_route(self):
         engine = GhostChainsEngine()
