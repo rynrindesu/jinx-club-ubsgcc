@@ -36,19 +36,27 @@ def next_hop(
     if hops_remaining is not None and hops_remaining < 1:
         raise ValueError("at least one hop is required to reach the destination")
 
+    # The node currently occupied is already visited too.  Excluding it stops
+    # a self-loop from being returned as the next hop.
     forbidden = set(visited_nodes)
-    forbidden.discard(current_node)
+    forbidden.add(current_node)
     forbidden.discard(destination)
     if hops_remaining is None:
         return _unconstrained_next_hop(
             adjacency, tolls, current_node, destination, forbidden
         )
+    # A legal route cannot revisit a node, so it never needs more than V - 1
+    # edges.  Clamping avoids needless dynamic-programming passes when the
+    # supplied allowance is larger than any possible legal path.
+    effective_hops = min(hops_remaining, len(adjacency) - 1)
+    if effective_hops < 1:
+        raise ValueError("destination cannot be reached within the hop allowance")
     return _hop_limited_next_hop(
         adjacency,
         tolls,
         current_node,
         destination,
-        hops_remaining,
+        effective_hops,
         forbidden,
     )
 
@@ -131,11 +139,18 @@ def _hop_limited_next_hop(
     hops_remaining: int,
     forbidden: set[str],
 ) -> str:
-    """Find the best route using at most ``hops_remaining`` edges."""
+    """Find the best route using at most ``hops_remaining`` edges.
 
-    costs: dict[str, float] = {destination: 0.0}
-    costs_by_remaining_hops = [costs]
-    for _ in range(hops_remaining):
+    ``costs`` holds the best (cost, number of hops) pair for each node for the
+    previous layer.  Retaining only this layer makes the dynamic program use
+    O(V) memory instead of O(hops_remaining * V).  Fewer hops break equal-cost
+    ties, which removes gratuitous zero-cost cycles from the chosen route.
+    """
+
+    costs: dict[str, tuple[float, int]] = {destination: (0.0, 0)}
+    # The selected first hop consumes one edge, so calculate only the
+    # remaining H - 1 layers.
+    for _ in range(hops_remaining - 1):
         next_costs = dict(costs)  # Arriving early is always allowed.
         for source, edges in adjacency.items():
             if source in forbidden:
@@ -143,18 +158,22 @@ def _hop_limited_next_hop(
             for target, weight in edges.items():
                 if target in forbidden or target not in costs:
                     continue
-                next_costs[source] = min(
-                    next_costs.get(source, inf), weight + tolls[target] + costs[target]
-                )
+                remaining_cost, remaining_hops = costs[target]
+                candidate = (weight + tolls[target] + remaining_cost, remaining_hops + 1)
+                best = next_costs.get(source)
+                if best is None or candidate < best:
+                    next_costs[source] = candidate
         costs = next_costs
-        costs_by_remaining_hops.append(costs)
 
-    after_this_hop = costs_by_remaining_hops[hops_remaining - 1]
     candidates = [
-        (weight + tolls[target] + after_this_hop[target], target)
+        (
+            weight + tolls[target] + costs[target][0],
+            costs[target][1] + 1,
+            target,
+        )
         for target, weight in adjacency[current_node].items()
-        if target not in forbidden and target in after_this_hop
+        if target not in forbidden and target in costs
     ]
     if not candidates:
         raise ValueError("destination cannot be reached within the hop allowance")
-    return min(candidates)[1]
+    return min(candidates)[2]

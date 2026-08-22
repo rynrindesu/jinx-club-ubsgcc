@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
+from functools import lru_cache
 
 import httpx
 from fastmcp import FastMCP
@@ -65,6 +66,13 @@ def _fetch_graph(map_id: str) -> dict[str, object]:
         raise ValueError("map_id must not be empty")
     base_url = os.getenv("TOOLBOX_CHALLENGE_URL", DEFAULT_CHALLENGE_URL).rstrip("/")
     graph_url = os.getenv("TOOLBOX_GRAPH_URL", f"{base_url}/graph")
+    return _cached_graph(graph_url, map_id)
+
+
+@lru_cache(maxsize=128)
+def _cached_graph(graph_url: str, map_id: str) -> dict[str, object]:
+    """Fetch each immutable opaque map ID once per process."""
+
     response = httpx.get(
         graph_url,
         params={"map_id": map_id},

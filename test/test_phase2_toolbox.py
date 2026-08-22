@@ -1,5 +1,10 @@
 import unittest
+from unittest.mock import Mock, patch
 
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.phase2.toolbox import server as toolbox_server
 from app.phase2.toolbox.routing import next_hop
 from app.phase2.toolbox.study import StudyDocument, select_passages
 
@@ -40,6 +45,27 @@ class RouteTests(unittest.TestCase):
 
         self.assertEqual(next_hop(graph, "A", "D", visited_nodes=["B"]), "C")
 
+    def test_hop_planner_prefers_fewer_hops_when_costs_tie(self):
+        graph = {
+            "adjacency": {"A": {"B": 0, "D": 10}, "B": {"D": 10}, "D": {}},
+            "tolls": {"A": 0, "B": 0, "D": 0},
+        }
+
+        self.assertEqual(next_hop(graph, "A", "D", hops_remaining=2), "D")
+
+
+class GraphFetchTests(unittest.TestCase):
+    def test_fetches_each_map_id_once(self):
+        response = Mock()
+        response.json.return_value = {"adjacency": {"A": {}}, "tolls": {"A": 0}}
+        toolbox_server._cached_graph.cache_clear()
+
+        with patch("app.phase2.toolbox.server.httpx.get", return_value=response) as get:
+            toolbox_server._fetch_graph("map-123")
+            toolbox_server._fetch_graph("map-123")
+
+        self.assertEqual(get.call_count, 1)
+
 
 class StudySelectionTests(unittest.TestCase):
     def test_returns_the_relevant_bounded_passage(self):
@@ -74,3 +100,36 @@ class StudySelectionTests(unittest.TestCase):
         passages = select_passages("sensor calibration", documents, encoder)
 
         self.assertLessEqual(sum(len(encoder.encode(passage)) for passage in passages), 900)
+
+
+class McpDiscoveryTests(unittest.TestCase):
+    def test_advertises_the_phase2_tools(self):
+        initialize = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "test", "version": "1"},
+            },
+        }
+        accept = {"Accept": "application/json, text/event-stream"}
+
+        with TestClient(app) as client:
+            initialized = client.post("/mcp", json=initialize, headers=accept)
+            session_headers = {**accept, "mcp-session-id": initialized.headers["mcp-session-id"]}
+            client.post(
+                "/mcp",
+                json={"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+                headers=session_headers,
+            )
+            response = client.post(
+                "/mcp",
+                json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+                headers=session_headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('"name":"find_study_passages"', response.text)
+        self.assertIn('"name":"next_route_node"', response.text)
