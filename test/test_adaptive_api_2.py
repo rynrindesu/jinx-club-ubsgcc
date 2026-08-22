@@ -67,6 +67,75 @@ class AdaptiveGatewayPhase2Tests(unittest.TestCase):
 
         self.assertEqual(result["sloOutput"], {"availability": 0.0, "p95LatencyMs": 0})
 
+    def test_consolidates_any_requested_service_after_the_timestamp(self):
+        self.body["heartbeats"].extend(
+            [
+                {
+                    "service": "billing",
+                    "timestamp": 1710000131,
+                    "latencyMs": 90,
+                    "status": "FAIL",
+                },
+                {
+                    "service": "billing",
+                    "timestamp": 1710000122,
+                    "latencyMs": 15,
+                    "status": "OK",
+                },
+            ]
+        )
+        self.body["sloQuery"] = {"service": "billing", "since": 1710000130}
+
+        result = solve(encode_payload(self.body))
+
+        self.assertEqual(result["sloOutput"], {"availability": 0.5, "p95LatencyMs": 300})
+
+    def test_all_ok_payments_service_has_full_availability(self):
+        self.body["heartbeats"].extend(
+            [
+                {
+                    "service": "payments",
+                    "timestamp": 1710000130,
+                    "latencyMs": 40,
+                    "status": "OK",
+                },
+                {
+                    "service": "payments",
+                    "timestamp": 1710000131,
+                    "latencyMs": 60,
+                    "status": "OK",
+                },
+            ]
+        )
+        self.body["sloQuery"] = {"service": "payments", "since": 1710000130}
+
+        result = solve(encode_payload(self.body))
+
+        self.assertEqual(result["sloOutput"], {"availability": 1.0, "p95LatencyMs": 60})
+
+    def test_all_failed_shipping_service_has_zero_availability(self):
+        self.body["heartbeats"].extend(
+            [
+                {
+                    "service": "shipping",
+                    "timestamp": 1710000130,
+                    "latencyMs": 110,
+                    "status": "FAIL",
+                },
+                {
+                    "service": "shipping",
+                    "timestamp": 1710000131,
+                    "latencyMs": 240,
+                    "status": "FAIL",
+                },
+            ]
+        )
+        self.body["sloQuery"] = {"service": "shipping", "since": 1710000130}
+
+        result = solve(encode_payload(self.body))
+
+        self.assertEqual(result["sloOutput"], {"availability": 0.0, "p95LatencyMs": 240})
+
 
 if __name__ == "__main__":
     unittest.main()

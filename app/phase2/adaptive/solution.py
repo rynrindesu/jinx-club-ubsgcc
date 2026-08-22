@@ -25,13 +25,16 @@ def adapt_input(adapt_input: dict[str, Any]) -> dict[str, Any]:
 def calculate_slo(
     heartbeats: list[dict[str, Any]], slo_query: dict[str, Any]
 ) -> dict[str, float | int]:
-    """Report availability and nearest-rank P95 latency for the queried window."""
+    """Report SLOs for any queried service in the requested time window."""
+
+    requested_service = slo_query["service"]
+    since_timestamp = slo_query["since"]
 
     matching_heartbeats = [
         heartbeat
         for heartbeat in heartbeats
-        if heartbeat["service"] == slo_query["service"]
-        and heartbeat["timestamp"] >= slo_query["since"]
+        if heartbeat["service"] == requested_service
+        and heartbeat["timestamp"] >= since_timestamp
     ]
 
     if not matching_heartbeats:
