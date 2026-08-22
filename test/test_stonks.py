@@ -1,6 +1,6 @@
 import unittest
 
-from app.phase04.stonks import solve_case
+from app.phase04.stonks import _score_actions, solve_case
 
 
 class StonksTests(unittest.TestCase):
@@ -124,6 +124,31 @@ class StonksTests(unittest.TestCase):
         self.assertIn("b-B-1", actions)
         self.assertIn("s-A-1", actions)
         self.assertIn("s-B-1", actions)
+
+    def test_compounds_across_a_repeated_year_bounce(self):
+        case = {
+            "energy": 7,
+            "capital": 3,
+            "timeline": {
+                "2037": {
+                    "A": {"price": 11, "qty": 2},
+                    "B": {"price": 11, "qty": 4},
+                    "C": {"price": 4, "qty": 1},
+                },
+                "2036": {
+                    "A": {"price": 4, "qty": 4},
+                    "B": {"price": 7, "qty": 4},
+                    "C": {"price": 9, "qty": 2},
+                },
+                "2035": {
+                    "A": {"price": 3, "qty": 4},
+                    "B": {"price": 10, "qty": 3},
+                    "C": {"price": 1, "qty": 2},
+                },
+            },
+        }
+
+        self.assertEqual(_score_actions(case, solve_case(case)), 78)
 
 if __name__ == "__main__":
     unittest.main()
