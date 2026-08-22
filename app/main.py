@@ -1,13 +1,25 @@
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 from .phase1.adaptive_api_gateway_1.solution import solve
-from .phase1.showdown import decide_move
 from .phase1.kanchiong_delivery_driver.solution import solve_case
+from .phase1.showdown import decide_move
+from .phase1.toolbox.server import mcp
 
-app = FastAPI(title="Jinx Club Challenge Gateway")
+mcp_app = mcp.http_app(path="/")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with mcp_app.lifespan(app):
+        yield
+
+
+app = FastAPI(title="Jinx Club Challenge Gateway", lifespan=lifespan)
+app.mount("/mcp", mcp_app)
 
 
 class SolveRequest(BaseModel):
