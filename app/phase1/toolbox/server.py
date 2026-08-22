@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+import ast
+from typing import Literal
 
 from fastmcp import FastMCP
-from pydantic import Field
 
 from .shapes import classify_shape_image
 
 
 mcp = FastMCP("Tool-box Nursery")
-Operand = Annotated[int, Field(ge=-100, le=100)]
 
 
 @mcp.tool(
@@ -24,24 +23,50 @@ def get_name() -> str:
 
 @mcp.tool(
     name="calculate",
-    description="Calculate two integers using +, -, *, or /.",
+    description="Evaluate an integer expression using BODMAS: brackets, then *, /, +, and -.",
 )
-def calculate(
-    left: Operand,
-    operator: Literal["+", "-", "*", "/"],
-    right: Operand,
-) -> int | float:
-    if operator == "+":
-        return left + right
-    if operator == "-":
-        return left - right
-    if operator == "*":
-        return left * right
-    if right == 0:
-        raise ValueError("division by zero is undefined")
+def calculate(expression: str) -> int | float:
+    """Evaluate one expression without using Python's unsafe ``eval``."""
 
-    result = left / right
-    return int(result) if result.is_integer() else result
+    if len(expression) > 500:
+        raise ValueError("expression is too long")
+
+    try:
+        tree = ast.parse(expression.strip(), mode="eval")
+    except SyntaxError as error:
+        raise ValueError("expression is not valid arithmetic") from error
+
+    result = _evaluate_expression(tree.body)
+    return int(result) if isinstance(result, float) and result.is_integer() else result
+
+
+def _evaluate_expression(node: ast.expr) -> int | float:
+    if isinstance(node, ast.Constant):
+        if type(node.value) is not int or not -100 <= node.value <= 100:
+            raise ValueError("every operand must be an integer from -100 to 100")
+        return node.value
+
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        value = _evaluate_expression(node.operand)
+        return value if isinstance(node.op, ast.UAdd) else -value
+
+    if not isinstance(node, ast.BinOp):
+        raise ValueError("only brackets and +, -, *, / are supported")
+
+    left = _evaluate_expression(node.left)
+    right = _evaluate_expression(node.right)
+    if isinstance(node.op, ast.Add):
+        return left + right
+    if isinstance(node.op, ast.Sub):
+        return left - right
+    if isinstance(node.op, ast.Mult):
+        return left * right
+    if isinstance(node.op, ast.Div):
+        if right == 0:
+            raise ValueError("division by zero is undefined")
+        return left / right
+
+    raise ValueError("only brackets and +, -, *, / are supported")
 
 
 @mcp.tool(
