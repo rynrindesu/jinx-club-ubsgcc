@@ -912,7 +912,11 @@ def _score_actions(case: dict[str, Any], actions: list[str]) -> int | None:
     energy_left = int(case["energy"])
     year = PRESENT_YEAR
     holdings: dict[str, int] = {}
-    bought_lots: set[tuple[int, str]] = set()
+    remaining_inventory = {
+        (quote_year, stock): qty
+        for quote_year, year_quotes in timeline.items()
+        for stock, (_, qty) in year_quotes.items()
+    }
 
     for action in actions:
         if not isinstance(action, str) or len(action) < 3 or action[1] != "-":
@@ -954,9 +958,9 @@ def _score_actions(case: dict[str, Any], actions: list[str]) -> int | None:
         if kind == "b":
             lot = (year, stock)
             cost = price * quantity
-            if lot in bought_lots or quantity > available or cost > cash:
+            if quantity > remaining_inventory.get(lot, available) or cost > cash:
                 return None
-            bought_lots.add(lot)
+            remaining_inventory[lot] -= quantity
             cash -= cost
             holdings[stock] = holdings.get(stock, 0) + quantity
         else:
