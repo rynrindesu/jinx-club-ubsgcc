@@ -16,11 +16,11 @@ from typing import Any
 
 PRESENT_YEAR = 2037
 
-_MAX_LOTS = 9
+_MAX_LOTS = 10
 _MAX_TOTAL_QUANTITY = 20
 _MAX_STOCKS = 4
 _MAX_YEARS = 8
-_MAX_ENERGY = 12
+_MAX_ENERGY = 14
 _MAX_EXPANDED_STATES = 300_000
 _MAX_SEARCH_NODES = 900_000
 
@@ -81,18 +81,7 @@ def _normalize_case(
     if len(reachable_years) > _MAX_YEARS:
         return None
 
-    stock_names = sorted(
-        {
-            stock
-            for year in reachable_years
-            for stock in prices.get(year, {})
-        }
-    )
-    if len(stock_names) > _MAX_STOCKS:
-        return None
-    stock_indices = {stock: index for index, stock in enumerate(stock_names)}
-
-    lots: list[_Lot] = []
+    relevant_lots: list[tuple[int, str, int, int]] = []
     for buy_year in reachable_years:
         for stock, qty in quantities.get(buy_year, {}).items():
             if qty <= 0:
@@ -116,15 +105,25 @@ def _normalize_case(
             if not can_profit:
                 continue
 
-            lots.append(
-                _Lot(
-                    year=buy_year,
-                    stock_index=stock_indices[stock],
-                    stock=stock,
-                    price=buy_price,
-                    qty=qty,
-                )
-            )
+            relevant_lots.append((buy_year, stock, buy_price, qty))
+
+    # Zero-quantity and never-profitable quotes do not need a holdings
+    # dimension.  Filtering them before applying the stock guard lets the
+    # exact solver cover compact cases with a wide but mostly inert market.
+    stock_names = sorted({stock for _, stock, _, _ in relevant_lots})
+    if len(stock_names) > _MAX_STOCKS:
+        return None
+    stock_indices = {stock: index for index, stock in enumerate(stock_names)}
+    lots = [
+        _Lot(
+            year=year,
+            stock_index=stock_indices[stock],
+            stock=stock,
+            price=price,
+            qty=qty,
+        )
+        for year, stock, price, qty in relevant_lots
+    ]
 
     if (
         len(lots) > _MAX_LOTS
