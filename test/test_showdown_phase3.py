@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -33,10 +34,14 @@ from app.phase3.showdown.protocol import (
 from app.phase3.showdown.replay import fit_replays, write_seed
 from app.phase3.showdown.rules import RuleModel, get_hypothesis
 from app.phase3.showdown.simulator import (
+    ScriptedArchetype,
     SimulationConfig,
+    benchmark,
     built_in_strategy,
+    make_phase3_policy_strategy,
     simulate_leg,
 )
+from app.showdown import decide_move as dispatch_move
 
 
 NAMES = ("you", "Dana", "Miles", "Theo", "Rhea", "Bram")
@@ -102,6 +107,21 @@ def payload(**changes: object) -> dict[str, object]:
     }
     result.update(changes)
     return result
+
+
+def locked_rule_knowledge(codename: str, hypothesis: str) -> EventKnowledge:
+    """Return mature seed knowledge concentrated on one synthetic truth."""
+
+    model = RuleModel(codename)
+    seeded = model.to_dict()
+    seeded["posterior"] = {
+        name: float(name == hypothesis) for name in model.posterior()
+    }
+    seeded["observations"] = 100
+    seeded["fit_sum"] = 98.5
+    knowledge = EventKnowledge()
+    knowledge.rules[codename] = RuleModel.from_dict(seeded)
+    return knowledge
 
 
 class ProtocolTests(unittest.TestCase):
@@ -487,6 +507,203 @@ class ReplayTests(unittest.TestCase):
                 fit_replays([first_path, second_path])
 
 
+class SimulatorFoundationTests(unittest.TestCase):
+    @staticmethod
+    def passive(request: dict[str, object]) -> dict[str, str]:
+        legal = request["legal_actions"]
+        assert isinstance(legal, list)
+        if "check" in legal:
+            return {"action": "check"}
+        if "call" in legal:
+            return {"action": "call"}
+        return {"action": "fold"}
+
+    def test_nonstandard_codename_requires_explicit_rule_truth(self) -> None:
+        with self.assertRaisesRegex(ValueError, "requires rule_hypothesis or ranker"):
+            SimulationConfig(table_rule="obsidian")
+
+    def test_rule_hypothesis_and_custom_ranker_control_settlement(self) -> None:
+        opponents = {seat: self.passive for seat in range(1, 6)}
+        standard = simulate_leg(
+            0,
+            self.passive,
+            opponents,
+            SimulationConfig(total_hands=1),
+        )
+        low_truth = simulate_leg(
+            0,
+            self.passive,
+            opponents,
+            SimulationConfig(
+                total_hands=1,
+                table_rule="obsidian",
+                rule_hypothesis="pair-last-raw-low",
+            ),
+        )
+        custom_low = simulate_leg(
+            0,
+            self.passive,
+            opponents,
+            SimulationConfig(
+                total_hands=1,
+                table_rule="synthetic-low",
+                ranker=lambda number, _community: (-number,),
+            ),
+        )
+
+        # Seed zero deals [7, 13, 7, 1, 5, 9] with community 8.
+        self.assertEqual(standard.hands[0].winners, (1,))
+        self.assertEqual(low_truth.hands[0].winners, (3,))
+        self.assertEqual(custom_low.hands[0].winners, (3,))
+        for result in (standard, low_truth, custom_low):
+            self.assertEqual(sum(result.final_stacks), 1200)
+
+    def test_scripted_archetype_uses_configured_rule_strength(self) -> None:
+        raw = payload(
+            round="post_reveal",
+            your_number=13,
+            community_number=13,
+            pot=12,
+            to_call=0,
+            legal_actions=["check", "bet"],
+            min_raise_to=2,
+            max_raise_to=200,
+            current_hand_actions=[],
+        )
+        standard = ScriptedArchetype(
+            tightness=0.0,
+            aggression=1.0,
+            bluff_frequency=0.0,
+        )
+        pair_loses = ScriptedArchetype(
+            tightness=0.0,
+            aggression=1.0,
+            bluff_frequency=0.0,
+            ranker=get_hypothesis("pair-last-raw-low").rank,
+        )
+        self.assertEqual(standard(raw).action, "bet")
+        self.assertEqual(pair_loses(raw).action, "check")
+
+    def test_isolated_seeded_policy_folds_observed_obsidian_traps(self) -> None:
+        knowledge = locked_rule_knowledge("obsidian", "pair-last-raw-low")
+        before = knowledge.to_dict()
+        strategy = make_phase3_policy_strategy(knowledge=knowledge)
+
+        pre_players = [
+            player(0),
+            player(1),
+            player(2, stack=199, bet=1),
+            player(3, stack=198, bet=2),
+            player(4, folded=True),
+            player(5, stack=198, bet=2),
+        ]
+        worst_pre_reveal = payload(
+            match_id="obsidian-worst-open",
+            table_rule="obsidian",
+            hand_number=2,
+            your_number=13,
+            button_seat=1,
+            pot=5,
+            to_call=2,
+            min_raise_to=4,
+            max_raise_to=200,
+            players=pre_players,
+            current_hand_actions=[
+                {"round": "pre_reveal", "seat": 4, "action": "fold"},
+                {"round": "pre_reveal", "seat": 5, "action": "call"},
+            ],
+        )
+        self.assertEqual(strategy(worst_pre_reveal), {"action": "fold"})
+
+        pair_players = [
+            player(0, stack=183, delta=-17),
+            player(1, stack=17, bet=183),
+            player(2, folded=True),
+            player(3, folded=True),
+            player(4, folded=True),
+            player(5, folded=True),
+        ]
+        losing_pair_all_in = payload(
+            match_id="obsidian-pair-all-in",
+            table_rule="obsidian",
+            hand_number=20,
+            round="post_reveal",
+            your_number=11,
+            community_number=11,
+            your_stack=183,
+            pot=183,
+            to_call=183,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+            players=pair_players,
+            current_hand_actions=[
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "bet",
+                    "amount": 183,
+                }
+            ],
+        )
+        self.assertEqual(strategy(losing_pair_all_in), {"action": "fold"})
+        self.assertEqual(knowledge.to_dict(), before)
+
+    def test_positive_second_place_is_not_mistaken_for_a_safe_lead(self) -> None:
+        strategy = make_phase3_policy_strategy(
+            knowledge=locked_rule_knowledge("cinnabar", "standard")
+        )
+        standings = [
+            player(0, stack=386, delta=186),
+            player(1, stack=420, delta=220),
+            player(2, stack=130, delta=-70),
+            player(3, stack=110, delta=-90),
+            player(4, stack=90, delta=-110),
+            player(5, stack=64, delta=-136),
+        ]
+        raw = payload(
+            match_id="positive-second",
+            table_rule="cinnabar",
+            hand_number=60,
+            round="post_reveal",
+            your_number=13,
+            community_number=13,
+            your_stack=386,
+            pot=3,
+            to_call=0,
+            legal_actions=["check", "bet"],
+            min_raise_to=2,
+            max_raise_to=386,
+            players=standings,
+        )
+        self.assertEqual(strategy(raw)["action"], "bet")
+
+    def test_benchmark_constructs_fresh_strategy_for_each_trial(self) -> None:
+        calls = 0
+
+        def factory():
+            nonlocal calls
+            calls += 1
+            return self.passive
+
+        opponents = {seat: self.passive for seat in range(1, 6)}
+        report = benchmark(
+            strategy_factory=factory,
+            trials=3,
+            opponent_strategies=opponents,
+            config=SimulationConfig(total_hands=1),
+        )
+        self.assertEqual((calls, report.trials), (3, 3))
+        with self.assertRaisesRegex(ValueError, "either strategy or strategy_factory"):
+            benchmark(
+                self.passive,
+                strategy_factory=factory,
+                trials=1,
+                opponent_strategies=opponents,
+                config=SimulationConfig(total_hands=1),
+            )
+
+
 class ServiceAndSimulatorTests(unittest.TestCase):
     def setUp(self) -> None:
         reset_runtime_for_tests()
@@ -494,10 +711,23 @@ class ServiceAndSimulatorTests(unittest.TestCase):
     def test_standalone_http_contract(self) -> None:
         client = TestClient(app)
         self.assertEqual(client.get("/health").status_code, 200)
+        runtime = client.get("/showdown/runtime")
+        self.assertEqual(runtime.status_code, 200)
+        self.assertEqual(
+            runtime.json()["phase3_engine"],
+            "app.phase3.showdown.engine",
+        )
         response = client.post("/move", json=payload())
         self.assertEqual(response.status_code, 200)
         request = parse_payload(payload())
         self.assertEqual(validate_response(request, response.json()), response.json())
+
+    def test_shared_gateway_dispatches_phase_three_to_clean_room_engine(self) -> None:
+        raw = payload()
+        expected = {"action": "fold"}
+        with patch("app.showdown.decide_phase3_move", return_value=expected) as routed:
+            self.assertEqual(dispatch_move(raw), expected)
+        routed.assert_called_once_with(raw)
 
     def test_decision_is_deterministic_and_within_deadline(self) -> None:
         raw = payload()

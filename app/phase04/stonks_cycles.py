@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import log
+from time import perf_counter
 from typing import Any
 
 
@@ -130,6 +131,7 @@ def _run_strategy(
     capital: int,
     lots: list[_Lot],
     strategy: str,
+    deadline: float | None = None,
 ) -> tuple[int, list[str]]:
     cash = capital
     year = PRESENT_YEAR
@@ -138,8 +140,12 @@ def _run_strategy(
     actions: list[str] = []
 
     for _ in range(_MAX_TRADES):
+        if deadline is not None and perf_counter() >= deadline:
+            break
         best: tuple[tuple[float, ...], int, _Sale, int, int] | None = None
         for lot_index, lot in enumerate(lots):
+            if deadline is not None and perf_counter() >= deadline:
+                break
             available = remaining[lot_index]
             if available <= 0 or lot.price > cash:
                 continue
@@ -183,7 +189,9 @@ def _run_strategy(
     return cash, actions
 
 
-def solve_case(case: dict[str, Any]) -> list[str]:
+def solve_case(
+    case: dict[str, Any], deadline: float | None = None
+) -> list[str]:
     """Return the best plan found across complementary cycle priorities."""
 
     energy, capital, lots = _parse_case(case)
@@ -198,8 +206,10 @@ def solve_case(case: dict[str, Any]) -> list[str]:
         "quick",
         "cheap",
     ):
+        if deadline is not None and perf_counter() >= deadline:
+            break
         cash, actions = _run_strategy(
-            energy, capital, lots, strategy
+            energy, capital, lots, strategy, deadline
         )
         if cash > best_cash or (
             cash == best_cash and len(actions) < len(best_actions)

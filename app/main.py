@@ -93,6 +93,21 @@ def health_endpoint():
     return {"status": "ok"}
 
 
+@app.get("/showdown/runtime")
+def showdown_runtime_endpoint() -> dict[str, str]:
+    """Identify the Phase 3 route so deployments can be verified directly."""
+
+    runtime = {
+        "router": "phase-aware-v3",
+        "phase3_engine": "app.phase3.showdown.engine",
+    }
+    if revision := os.getenv("RENDER_GIT_COMMIT"):
+        runtime["revision"] = revision
+    if instance := os.getenv("RENDER_INSTANCE_ID"):
+        runtime["instance"] = instance
+    return runtime
+
+
 @app.get("/ghost-chains/health")
 def ghost_chains_health_endpoint():
     """Report availability using the Ghost Chains coordinator contract."""

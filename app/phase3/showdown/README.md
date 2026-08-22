@@ -1,7 +1,8 @@
 # SHOWDOWN Phase 3
 
-This is a standalone, clean-room Phase 3 service. It does not import the
-earlier SHOWDOWN implementations and does not replace the shared gateway.
+This is a clean-room Phase 3 service. It does not import the earlier SHOWDOWN
+implementations. The shared gateway routes `phase: 3` requests here, and the
+same engine can also run as a standalone app.
 
 ## Run
 

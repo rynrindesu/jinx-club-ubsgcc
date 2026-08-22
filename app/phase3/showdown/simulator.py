@@ -1,6 +1,7 @@
 """Deterministic, clean-room simulator for SHOWDOWN phase 3 policy work.
 
-The simulator intentionally models only the documented ``standard`` table rule.
+The simulator uses ``standard`` by default and requires an explicit ranking
+hypothesis or ranker whenever an opaque nonstandard codename is configured.
 Its move callbacks receive dictionaries shaped like protocol-v2 ``/move``
 requests and return either an :class:`Action`, an action string, or a mapping
 such as ``{"action": "raise", "amount": 18}``.
@@ -19,17 +20,21 @@ Assumptions made where the coordinator contract is not explicit:
   button.  These choices preserve chips and make every seeded run reproducible.
 
 This is a tuning tool, not a coordinator clone.  It has no dependency on the
-phase 1/2 implementations or on the live bot.
+phase 1/2 implementations.  The production Phase-3 policy adapter is imported
+only when explicitly requested.
 """
 
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import math
+from pathlib import Path
 import random
 from typing import Any, Callable, Mapping, Protocol, Sequence, TypeAlias
+
+from .rules import RuleHypothesis, get_hypothesis
 
 
 PLAYER_NAMES = ("you", "Dana", "Miles", "Theo", "Rhea", "Bram")
@@ -51,6 +56,9 @@ class Action:
 
 ActionLike: TypeAlias = Action | str | Mapping[str, object]
 DecisionCallback: TypeAlias = Callable[[Mapping[str, Any]], ActionLike]
+StrategyFactory: TypeAlias = Callable[[], DecisionCallback]
+RankValue: TypeAlias = tuple[int | float, ...] | list[int | float] | int | float
+Ranker: TypeAlias = Callable[[int, int], RankValue]
 
 
 class Strategy(Protocol):
@@ -151,6 +159,12 @@ class SimulationConfig:
     hero_seat: int = 0
     initial_button: int = 0
     table_rule: str = "standard"
+    # ``table_rule`` is the opaque codename sent to the policy.  The simulator
+    # must separately know the true ranking formula used to settle the hand.
+    # Known hypothesis names may be supplied directly; a custom ranker supports
+    # synthetic/out-of-grammar rules without changing the production grammar.
+    rule_hypothesis: str | RuleHypothesis | None = None
+    ranker: Ranker | None = field(default=None, repr=False, compare=False)
     match_id_prefix: str = "phase3-sim"
     max_actions_per_round: int = 4096
 
@@ -161,6 +175,31 @@ class SimulationConfig:
             raise ValueError("blinds must satisfy 0 < small_blind <= big_blind")
         if not 0 <= self.hero_seat < len(PLAYER_NAMES):
             raise ValueError("hero_seat must identify one of the six seats")
+        if not isinstance(self.table_rule, str) or not self.table_rule.strip():
+            raise ValueError("table_rule must be a non-empty codename")
+        if self.ranker is not None and self.rule_hypothesis is not None:
+            raise ValueError("provide either rule_hypothesis or ranker, not both")
+
+        if self.ranker is None:
+            truth = self.rule_hypothesis
+            if truth is None:
+                # ``standard`` is both a public rule label and a hypothesis.
+                # Opaque nonstandard codenames cannot safely imply their truth.
+                if self.table_rule != "standard":
+                    raise ValueError(
+                        "a nonstandard table_rule requires rule_hypothesis or ranker"
+                    )
+                truth = "standard"
+            get_hypothesis(truth)
+        self.rank(1, 1)
+
+    def rank(self, number: int, community: int) -> tuple[int | float, ...]:
+        """Return one comparable rank under the simulator's actual rule."""
+
+        if self.ranker is not None:
+            return _rank_key(self.ranker(number, community))
+        truth = self.rule_hypothesis or "standard"
+        return get_hypothesis(truth).rank(number, community)
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,6 +228,41 @@ def standard_rank(number: int, community_number: int) -> tuple[int, int]:
     """Rank one number under the documented standard rule."""
 
     return (int(number == community_number), number)
+
+
+def _rank_key(value: RankValue) -> tuple[int | float, ...]:
+    """Normalize a custom ranker result into a finite comparable tuple."""
+
+    raw = value if isinstance(value, (tuple, list)) else (value,)
+    if not raw:
+        raise ValueError("ranker must return at least one numeric component")
+    result: list[int | float] = []
+    for component in raw:
+        if isinstance(component, bool) or not isinstance(component, (int, float)):
+            raise TypeError("ranker components must be numeric")
+        if not math.isfinite(float(component)):
+            raise ValueError("ranker components must be finite")
+        result.append(component)
+    return tuple(result)
+
+
+def _rank_strength(
+    number: int,
+    community: int | None,
+    ranker: Ranker,
+) -> float:
+    """Heads-up share against a uniform number under one known rule truth."""
+
+    communities = range(1, 14) if community is None else (community,)
+    total = 0.0
+    comparisons = 0
+    for revealed in communities:
+        hero = _rank_key(ranker(number, revealed))
+        for opponent in range(1, 14):
+            rival = _rank_key(ranker(opponent, revealed))
+            total += 1.0 if hero > rival else 0.5 if hero == rival else 0.0
+            comparisons += 1
+    return total / max(1, comparisons)
 
 
 def cleared(deltas: Sequence[int], hero_seat: int = 0) -> bool:
@@ -245,6 +319,7 @@ class ScriptedArchetype:
     aggression: float = 0.5
     bluff_frequency: float = 0.06
     sizing: float = 0.65
+    ranker: Ranker = field(default=standard_rank, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         for value in (self.tightness, self.aggression, self.bluff_frequency):
@@ -252,12 +327,17 @@ class ScriptedArchetype:
                 raise ValueError("archetype rates must be in [0, 1]")
         if self.sizing <= 0:
             raise ValueError("sizing must be positive")
+        _rank_key(self.ranker(1, 1))
 
     def __call__(self, request: Mapping[str, Any]) -> Action:
         number = int(request["your_number"])
         community = request.get("community_number")
-        paired = community is not None and number == int(community)
-        strength = 1.0 if paired else number / 13.0
+        strength = _rank_strength(
+            number,
+            int(community) if community is not None else None,
+            self.ranker,
+        )
+        premium = strength >= 0.92
         live = sum(
             not player["folded"] and not player["busted"]
             for player in request["players"]
@@ -268,23 +348,30 @@ class ScriptedArchetype:
         aggression_roll = _unit_interval(request, "aggression")
 
         if aggressive and (bluff or (strength >= threshold and aggression_roll < self.aggression)):
-            return _sized_action(request, self.sizing * (1.35 if paired else 1.0))
+            return _sized_action(request, self.sizing * (1.35 if premium else 1.0))
 
         to_call = int(request["to_call"])
         if to_call:
             price = to_call / max(1, int(request["pot"]) + to_call)
-            if paired or strength >= max(0.24, threshold - 0.17) or price < strength * 0.22:
+            if premium or strength >= max(0.24, threshold - 0.17) or price < strength * 0.22:
                 return Action("call")
             return Action("fold")
         return Action("check")
 
 
-def built_in_strategy(request: Mapping[str, Any]) -> Action:
-    """A deterministic, moderately high-variance baseline hero policy."""
+def _built_in_strategy_for_rule(
+    request: Mapping[str, Any], ranker: Ranker
+) -> Action:
+    """Rule-aware implementation behind the public standard baseline."""
 
     number = int(request["your_number"])
     community = request.get("community_number")
-    pair = community is not None and number == int(community)
+    strength = _rank_strength(
+        number,
+        int(community) if community is not None else None,
+        ranker,
+    )
+    premium = strength >= 0.92
     live_opponents = sum(
         int(player["seat"]) != int(request["your_seat"])
         and not player["folded"]
@@ -292,7 +379,7 @@ def built_in_strategy(request: Mapping[str, Any]) -> Action:
         for player in request["players"]
     )
     legal = tuple(request["legal_actions"])
-    strong = pair or number >= (12 if live_opponents >= 4 else 10)
+    strong = strength >= (0.84 if live_opponents >= 4 else 0.70)
     late = int(request["hand_number"]) > int(request["total_hands"]) - 12
     deltas = [int(player["chip_delta"]) for player in request["players"]]
     hero_delta = deltas[int(request["your_seat"])]
@@ -300,29 +387,51 @@ def built_in_strategy(request: Mapping[str, Any]) -> Action:
     desperate = late and hero_delta < target
 
     if strong and ("bet" in legal or "raise" in legal):
-        return _sized_action(request, 1.25 if pair or desperate else 0.8)
+        return _sized_action(request, 1.25 if premium or desperate else 0.8)
     if desperate and live_opponents <= 2 and ("bet" in legal or "raise" in legal):
         return _sized_action(request, 1.1)
     if int(request["to_call"]):
         price = int(request["to_call"]) / max(
             1, int(request["pot"]) + int(request["to_call"])
         )
-        if pair or number >= 10 or (number >= 8 and price <= 0.15):
+        if premium or strength >= 0.70 or (strength >= 0.52 and price <= 0.15):
             return Action("call")
         return Action("fold")
     return Action("check")
 
 
-def default_opponents(hero_seat: int = 0) -> dict[int, ScriptedArchetype]:
+def built_in_strategy(request: Mapping[str, Any]) -> Action:
+    """A deterministic, moderately high-variance standard-rule baseline."""
+
+    return _built_in_strategy_for_rule(request, standard_rank)
+
+
+def default_opponents(
+    hero_seat: int = 0,
+    *,
+    ranker: Ranker = standard_rank,
+) -> dict[int, ScriptedArchetype]:
     """Return five different, seat-assigned (not name-assigned) archetypes."""
 
     seats = [seat for seat in range(6) if seat != hero_seat]
     profiles = (
-        ScriptedArchetype(tightness=0.82, aggression=0.30, sizing=0.55),
-        ScriptedArchetype(tightness=0.30, aggression=0.25, sizing=0.45),
-        ScriptedArchetype(tightness=0.46, aggression=0.88, bluff_frequency=0.13, sizing=0.95),
-        ScriptedArchetype(tightness=0.63, aggression=0.55, sizing=0.70),
-        ScriptedArchetype(tightness=0.20, aggression=0.72, bluff_frequency=0.18, sizing=1.15),
+        ScriptedArchetype(tightness=0.82, aggression=0.30, sizing=0.55, ranker=ranker),
+        ScriptedArchetype(tightness=0.30, aggression=0.25, sizing=0.45, ranker=ranker),
+        ScriptedArchetype(
+            tightness=0.46,
+            aggression=0.88,
+            bluff_frequency=0.13,
+            sizing=0.95,
+            ranker=ranker,
+        ),
+        ScriptedArchetype(tightness=0.63, aggression=0.55, sizing=0.70, ranker=ranker),
+        ScriptedArchetype(
+            tightness=0.20,
+            aggression=0.72,
+            bluff_frequency=0.18,
+            sizing=1.15,
+            ranker=ranker,
+        ),
     )
     return dict(zip(seats, profiles, strict=True))
 
@@ -363,13 +472,22 @@ class ShowdownSimulator:
         if self.history:
             raise RuntimeError("a ShowdownSimulator instance can only run once")
         opponents = dict(
-            opponent_strategies or default_opponents(self.config.hero_seat)
+            opponent_strategies
+            or default_opponents(
+                self.config.hero_seat,
+                ranker=self.config.rank,
+            )
         )
         missing = [seat for seat in range(6) if seat != self.config.hero_seat and seat not in opponents]
         if missing:
             raise ValueError(f"missing opponent strategies for seats {missing}")
         self._strategies = opponents
-        self._strategies[self.config.hero_seat] = hero_strategy or built_in_strategy
+        if hero_strategy is not None:
+            self._strategies[self.config.hero_seat] = hero_strategy
+        else:
+            self._strategies[self.config.hero_seat] = lambda request: (
+                _built_in_strategy_for_rule(request, self.config.rank)
+            )
 
         self.button = self._first_live_at_or_after(self.button)
         for hand_number in range(1, self.config.total_hands + 1):
@@ -686,14 +804,19 @@ class ShowdownSimulator:
             eligible = [seat for seat in contributors if not self.players[seat].folded]
             if eligible:
                 best = max(
-                    standard_rank(self.players[seat].number or 0, self._community)
+                    self.config.rank(
+                        self.players[seat].number or 0,
+                        self._community,
+                    )
                     for seat in eligible
                 )
                 winners = [
                     seat
                     for seat in eligible
-                    if standard_rank(self.players[seat].number or 0, self._community)
-                    == best
+                    if self.config.rank(
+                        self.players[seat].number or 0,
+                        self._community,
+                    ) == best
                 ]
                 ordered_winners = [seat for seat in tie_order if seat in winners]
                 share, remainder = divmod(layer, len(ordered_winners))
@@ -749,6 +872,55 @@ class ShowdownSimulator:
         )
 
 
+def make_phase3_policy_strategy(
+    *,
+    policy_config: Any | None = None,
+    seed_path: str | Path | None = None,
+    knowledge: Any | Mapping[str, Any] | None = None,
+) -> DecisionCallback:
+    """Build one isolated production-policy callback for a simulated leg.
+
+    The public engine intentionally owns process-global runtime learning.  A
+    benchmark must not share that state across seeds or policy candidates, so
+    this adapter clones seed knowledge and owns its own ``RuntimeStore``.  Call
+    this factory once per simulated leg (or pass it as ``strategy_factory`` to
+    :func:`benchmark`) while retaining normal within-leg learning.
+    """
+
+    from .learning import EventKnowledge, RuntimeStore
+    from .policy import HighVariancePolicy
+    from .protocol import parse_payload, validate_response
+
+    if seed_path is not None and knowledge is not None:
+        raise ValueError("provide either seed_path or knowledge, not both")
+
+    if seed_path is not None:
+        source = RuntimeStore(seed_path).knowledge
+    elif knowledge is None:
+        source = EventKnowledge()
+    elif isinstance(knowledge, EventKnowledge):
+        source = knowledge
+    elif isinstance(knowledge, Mapping):
+        source = EventKnowledge.from_dict(knowledge)
+    else:
+        raise TypeError("knowledge must be EventKnowledge or a seed mapping")
+
+    # Serialization is the canonical, deterministic deep-copy boundary for
+    # event knowledge.  The caller's seed remains read-only during simulation.
+    isolated = EventKnowledge.from_dict(source.to_dict())
+    store = RuntimeStore(knowledge=isolated)
+    policy = HighVariancePolicy(policy_config)
+
+    def decide(raw: Mapping[str, Any]) -> ActionLike:
+        request = parse_payload(raw)
+        with store.lock:
+            session = store.ingest(request)
+            proposed = policy.decide(request, session, store.knowledge)
+        return validate_response(request, proposed)
+
+    return decide
+
+
 def simulate_leg(
     seed: int,
     hero_strategy: DecisionCallback | None = None,
@@ -763,6 +935,7 @@ def simulate_leg(
 def benchmark(
     strategy: DecisionCallback | None = None,
     *,
+    strategy_factory: StrategyFactory | None = None,
     trials: int = 100,
     base_seed: int = 0,
     opponent_strategies: Mapping[int, DecisionCallback] | None = None,
@@ -772,15 +945,19 @@ def benchmark(
 
     if trials <= 0:
         raise ValueError("trials must be positive")
-    results = [
-        simulate_leg(
-            base_seed + trial,
-            strategy,
-            opponent_strategies,
-            config,
+    if strategy is not None and strategy_factory is not None:
+        raise ValueError("provide either strategy or strategy_factory, not both")
+    results: list[LegResult] = []
+    for trial in range(trials):
+        trial_strategy = strategy_factory() if strategy_factory is not None else strategy
+        results.append(
+            simulate_leg(
+                base_seed + trial,
+                trial_strategy,
+                opponent_strategies,
+                config,
+            )
         )
-        for trial in range(trials)
-    ]
     deltas = sorted(result.hero_delta for result in results)
     p90_index = max(0, math.ceil(0.90 * trials) - 1)
     return BenchmarkReport(
@@ -838,10 +1015,12 @@ __all__ = [
     "ShowdownSimulator",
     "SidePot",
     "SimulationConfig",
+    "StrategyFactory",
     "benchmark",
     "built_in_strategy",
     "cleared",
     "default_opponents",
+    "make_phase3_policy_strategy",
     "simulate_leg",
     "standard_rank",
     "tune",

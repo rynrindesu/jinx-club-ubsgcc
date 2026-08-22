@@ -17,6 +17,16 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
 
+    def test_showdown_runtime_identifies_phase_three_engine(self):
+        response = self.client.get("/showdown/runtime")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["router"], "phase-aware-v3")
+        self.assertEqual(
+            response.json()["phase3_engine"],
+            "app.phase3.showdown.engine",
+        )
+
     def test_move_endpoint_accepts_showdown_payload(self):
         request = sample_request()
 

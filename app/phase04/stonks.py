@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from functools import cmp_to_key
 from math import log
+from time import perf_counter
 from typing import Any, Iterable
 
 
@@ -21,6 +22,7 @@ _BEAM_WIDTH = 96
 _MAX_DEPTH = 96
 _MAX_GROUPS = 400
 _MAX_TRANSITIONS = 64
+_REQUEST_TIME_BUDGET_SECONDS = 8.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -816,6 +818,7 @@ def _best_sweep(
     capital: int,
     listings: list[_Listing],
     prices: dict[int, dict[str, int]],
+    deadline: float | None = None,
 ) -> tuple[int, list[str]]:
     routes = _candidate_routes(energy, capital, listings, prices)
     if not routes:
@@ -854,13 +857,48 @@ def _best_sweep(
         if len(listings) > 80
         else ("any", "wait_full", "wait_half", "wait_quarter", "full")
     )
+
+    # Make the search useful even under a tight batch deadline: sample every
+    # route with three complementary policies before spending time exhaustively
+    # tuning the earliest routes in the list.
     for route in routes:
+        target_cache: dict[
+            tuple[str, int, int], tuple[int, int] | None
+        ] = {}
+        for sale_policy, buy_policy, gate_policy in (
+            ("peak", "roi", "any"),
+            ("earliest", "rate", "any"),
+            ("quick_profit", "quick", "any"),
+        ):
+            if deadline is not None and perf_counter() >= deadline:
+                return best_cash, best_actions
+            cash, actions = _simulate_sweep(
+                route,
+                capital,
+                listings,
+                prices,
+                sale_policy,
+                buy_policy,
+                gate_policy,
+                target_cache,
+            )
+            if cash > best_cash or (
+                cash == best_cash and len(actions) < len(best_actions)
+            ):
+                best_cash = cash
+                best_actions = actions
+
+    for route in routes:
+        if deadline is not None and perf_counter() >= deadline:
+            break
         target_cache: dict[
             tuple[str, int, int], tuple[int, int] | None
         ] = {}
         for sale_policy in sale_policies:
             for buy_policy in buy_policies:
                 for gate_policy in gate_policies:
+                    if deadline is not None and perf_counter() >= deadline:
+                        return best_cash, best_actions
                     cash, actions = _simulate_sweep(
                         route,
                         capital,
@@ -879,14 +917,16 @@ def _best_sweep(
     return best_cash, best_actions
 
 
-def _solve_case_primary(case: dict[str, Any]) -> list[str]:
+def _solve_case_primary(
+    case: dict[str, Any], deadline: float | None = None
+) -> list[str]:
     """Return a profitable, energy-safe action sequence for one test case."""
 
     energy, capital, listings, prices = _parse_case(case)
 
     if len(listings) > 60:
         sweep_cash, sweep_actions = _best_sweep(
-            energy, capital, listings, prices
+            energy, capital, listings, prices, deadline
         )
         return sweep_actions if sweep_cash > capital else []
 
@@ -899,7 +939,7 @@ def _solve_case_primary(case: dict[str, Any]) -> list[str]:
     # exploit every quoted year on a round trip for large market matrices.
     if len(groups) > 160:
         sweep_cash, sweep_actions = _best_sweep(
-            energy, capital, listings, prices
+            energy, capital, listings, prices, deadline
         )
         return sweep_actions if sweep_cash > capital else []
 
@@ -924,8 +964,12 @@ def _solve_case_primary(case: dict[str, Any]) -> list[str]:
 
     max_depth = min(_MAX_DEPTH, max(1, energy), max(1, len(listings) * 6))
     for _ in range(max_depth):
+        if deadline is not None and perf_counter() >= deadline:
+            break
         next_states: list[_State] = []
         for state in frontier:
+            if deadline is not None and perf_counter() >= deadline:
+                break
             for transition in _candidate_transitions(state, groups, energy):
                 candidate = _apply_transition(state, transition)
                 next_states.append(candidate)
@@ -940,7 +984,7 @@ def _solve_case_primary(case: dict[str, Any]) -> list[str]:
         actions.append(f"j-{best.year}-{PRESENT_YEAR}")
 
     sweep_cash, sweep_actions = _best_sweep(
-        energy, capital, listings, prices
+        energy, capital, listings, prices, deadline
     )
     if sweep_cash > best.cash:
         return sweep_actions
@@ -1025,37 +1069,66 @@ def _score_actions(case: dict[str, Any], actions: list[str]) -> int | None:
     return cash
 
 
-def solve_case(case: dict[str, Any]) -> list[str]:
+def solve_case(
+    case: dict[str, Any], deadline: float | None = None
+) -> list[str]:
     """Run exact and complementary planners, returning their best legal plan."""
+
+    if deadline is not None and perf_counter() >= deadline:
+        return []
+    _, capital, listings, _ = _parse_case(case)
+    candidates: list[list[str]] = []
+
+    # High energy can be better spent on several complete buy/sell cycles
+    # than on one broad V-shaped sweep.  Keep this independent planner in the
+    # ensemble and establish a fast baseline before bounded searches run.
+    from .stonks_cycles import solve_case as solve_cycle_case
+
+    cycle_deadline = (
+        None
+        if deadline is None
+        else min(deadline, perf_counter() + 0.20)
+    )
+    candidates.append(solve_cycle_case(case, cycle_deadline))
+
+    # The independent one-sweep bounded-knapsack planner is occasionally
+    # stronger when reserving the initial capital across many outbound lots.
+    binary_blocks = sum(listing.qty.bit_length() for listing in listings)
+    knapsack_allowed = (
+        capital <= 20_000
+        and len(listings) <= 80
+        and binary_blocks <= 180
+    )
+    if deadline is not None:
+        knapsack_allowed = knapsack_allowed and (
+            capital <= 5_000
+            and len(listings) <= 60
+            and binary_blocks <= 120
+            and perf_counter() < deadline
+        )
+    if knapsack_allowed:
+        from .stonkers import solve_case as solve_knapsack_sweep
+
+        candidates.append(solve_knapsack_sweep(case))
 
     # Compact adversarial cases are finite enough to solve globally, including
     # partial sales and concurrent holdings that route heuristics can miss.
     try:
         from .stonks_exact import solve_case as solve_exact_case
 
-        exact_actions = solve_exact_case(case)
+        if deadline is None:
+            exact_deadline = None
+        else:
+            now = perf_counter()
+            exact_deadline = min(deadline, now + max(0.0, (deadline - now) * 0.55))
+        exact_actions = solve_exact_case(case, exact_deadline)
     except (KeyError, TypeError, ValueError):
         exact_actions = None
     if exact_actions is not None and _score_actions(case, exact_actions) is not None:
         return exact_actions
 
-    candidates = [_solve_case_primary(case)]
-    _, capital, listings, _ = _parse_case(case)
-
-    # High energy can be better spent on several complete buy/sell cycles
-    # than on one broad V-shaped sweep.  Keep this independent planner in the
-    # ensemble so its liquid-state reinvestment routes compete by final cash.
-    from .stonks_cycles import solve_case as solve_cycle_case
-
-    candidates.append(solve_cycle_case(case))
-
-    # The independent one-sweep bounded-knapsack planner is occasionally
-    # stronger when reserving the initial capital across many outbound lots.
-    binary_blocks = sum(listing.qty.bit_length() for listing in listings)
-    if capital <= 20_000 and len(listings) <= 80 and binary_blocks <= 180:
-        from .stonkers import solve_case as solve_knapsack_sweep
-
-        candidates.append(solve_knapsack_sweep(case))
+    if deadline is None or perf_counter() < deadline:
+        candidates.append(_solve_case_primary(case, deadline))
 
     best_actions: list[str] = []
     best_cash = capital
@@ -1072,6 +1145,14 @@ def solve_case(case: dict[str, Any]) -> list[str]:
 
 
 def solve_cases(cases: list[dict[str, Any]]) -> list[list[str]]:
-    """Solve every case in the root JSON array independently."""
+    """Solve a batch within Render's gateway window."""
 
-    return [solve_case(case) for case in cases]
+    request_deadline = perf_counter() + _REQUEST_TIME_BUDGET_SECONDS
+    answers: list[list[str]] = []
+    for index, case in enumerate(cases):
+        cases_left = len(cases) - index
+        now = perf_counter()
+        fair_share = max(0.05, (request_deadline - now) / max(1, cases_left))
+        case_deadline = min(request_deadline, now + fair_share)
+        answers.append(solve_case(case, case_deadline))
+    return answers

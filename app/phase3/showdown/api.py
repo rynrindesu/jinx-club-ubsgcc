@@ -17,6 +17,16 @@ def health() -> dict[str, str | int]:
     return {"status": "ok", "phase": 3}
 
 
+@app.get("/showdown/runtime")
+def runtime() -> dict[str, str]:
+    """Identify the decision engine used by standalone deployments."""
+
+    return {
+        "router": "standalone-v3",
+        "phase3_engine": "app.phase3.showdown.engine",
+    }
+
+
 @app.post("/move")
 def move(payload: dict[str, Any]) -> dict[str, str | int]:
     """Return a protocol-v2 move; engine failures degrade to a legal fallback."""

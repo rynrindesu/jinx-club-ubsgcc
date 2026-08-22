@@ -5,7 +5,7 @@ One FastAPI deployment hosts handlers for multiple coding challenges.
 ## Routes
 
 - `POST /solve` — retained mock adaptive-API challenge.
-- `POST /move` — SHOWDOWN, dispatched by phase from `app/showdown/`.
+- `POST /move` — SHOWDOWN, dispatched to the isolated Phase 1, 2, or 3 engine.
 - `POST /stonks` — Phase 04 Time Travelling Stonks planner.
 - `GET /health` — warm-up and deployment health check.
 
@@ -24,6 +24,10 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 Register the Render service base URL with SHOWDOWN. The coordinator appends
 `/move` when requesting a decision.
+
+For Phase 3, `GET /showdown/runtime` must report `phase-aware-v3` and
+`app.phase3.showdown.engine`. This verifies that the gateway is not falling
+back to an earlier SHOWDOWN policy.
 
 Ghost Chains now defaults to the cumulative Phase 3 engine. Set
 `GHOST_CHAINS_PHASE=1` or `GHOST_CHAINS_PHASE=2` only when evaluating an older
@@ -55,3 +59,12 @@ hand, because no later `/move` callback exists for it. `Phase2State` exposes
 `ingest_completed_hands(...)` for an external replay runner; the callback itself
 cannot fetch `/matches/<runId>` because the coordinator does not send that run
 ID to the bot.
+
+## SHOWDOWN Phase 3
+
+Requests with `"phase": 3` are routed by the shared gateway to the clean-room
+engine in `app/phase3/showdown/`. The same engine can also run standalone:
+
+```bash
+uvicorn app.phase3.showdown.api:app --host 0.0.0.0 --port 8000
+```

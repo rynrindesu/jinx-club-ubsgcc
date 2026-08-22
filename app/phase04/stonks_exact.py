@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any
 
 
@@ -147,7 +148,9 @@ def _reconstruct(
     return actions
 
 
-def solve_case(case: dict[str, Any]) -> list[str] | None:
+def solve_case(
+    case: dict[str, Any], deadline: float | None = None
+) -> list[str] | None:
     """Return an optimal compact-case plan, or ``None`` to use a fallback."""
 
     normalized = _normalize_case(case)
@@ -199,6 +202,8 @@ def solve_case(case: dict[str, Any]) -> list[str] | None:
         return True
 
     while queue:
+        if deadline is not None and perf_counter() >= deadline:
+            return None
         state, cash, node_id = queue.popleft()
         if best.get(state) != (cash, node_id):
             continue
