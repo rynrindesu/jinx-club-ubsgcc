@@ -24,6 +24,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 Register the Render service base URL with SHOWDOWN. The coordinator appends
 `/move` when requesting a decision.
 
+Ghost Chains defaults to the Phase 1 engine. Set `GHOST_CHAINS_PHASE=2` in the
+deployment environment before a Phase 2 evaluation. The read-only
+`GET /ghost-chains/runtime` endpoint reports the active phase and model so a
+deployment can be verified before triggering an evaluation. On Render it also
+reports the deployed Git revision and instance identifier.
+
 ## SHOWDOWN Phase 2
 
 Phase 1 keeps its existing standard-rule policy. Phase 2 is isolated in
@@ -32,10 +38,13 @@ Phase 1 keeps its existing standard-rule policy. Phase 2 is isolated in
 - showdown-rule learning keyed by the opaque `table_rule` codename;
 - repeat-safe ingestion of the rolling `recent_hands` window;
 - a candidate-rule ensemble with a transitive pairwise fallback;
+- validated scouting comparisons compiled from completed Phase 2 attempts;
 - opponent tendencies carried across the four legs of one attempt; and
 - uncertainty, re-raise, and `+25`-cushion risk controls.
 
-Rule knowledge lives for the lifetime of the server process, so it carries
+Validated scouting evidence is replayed into the normal learner by fixed leg
+order, so a deployment does not discard discoveries from completed scouting
+attempts. New rule knowledge then lives for the server process and carries
 across retries without mixing opponent profiles between attempts. The supplied
 Uvicorn command runs one worker, which keeps that in-memory state coherent.
 

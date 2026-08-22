@@ -195,11 +195,17 @@ class RuleKnowledge:
         distinct_communities = len(
             {observation.community for observation in self.observations}
         )
+        disagreement = upper - lower
+        locally_resolved = (
+            len(self.active_candidates) <= 4
+            and agreement >= 0.84
+            and disagreement <= 0.10
+        )
         if (
             self.observation_count >= 8
             and distinct_communities >= 4
             and self.active_candidates
-            and agreement >= 0.985
+            and (agreement >= 0.985 or locally_resolved)
         ):
             confidence = "learned"
 
@@ -207,7 +213,7 @@ class RuleKnowledge:
             mean=fmean(equities),
             lower=lower,
             upper=upper,
-            disagreement=upper - lower,
+            disagreement=disagreement,
             coverage=coverage,
             candidate_count=len(self.active_candidates),
             observation_count=self.observation_count,

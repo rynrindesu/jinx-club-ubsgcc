@@ -2,9 +2,11 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import math
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+import app.main as main_module
 from app.main import app
 from app.phase1.ghost_chains import (
     GhostChainsEngine,
@@ -106,18 +108,14 @@ class StructuralScoringTests(unittest.TestCase):
         self.assertGreater(long_shortcut, extension)
         self.assertGreater(long_shortcut, short_shortcut)
 
-    def test_simple_fan_in_is_small_but_nonzero(self):
+    def test_unconnected_fan_in_stays_neutral(self):
         isolated = score_edges([("A", "C")], prefix="fan-isolated")[-1]
         fan_in = score_edges(
             [("A", "C"), ("B", "C")], prefix="fan-distinct"
         )[-1]
-        extension = score_edges(
-            [("A", "B"), ("B", "C")], prefix="fan-extension"
-        )[-1]
 
         self.assertEqual(isolated, 0.0)
-        self.assertGreater(fan_in, isolated)
-        self.assertLess(fan_in, extension)
+        self.assertEqual(fan_in, isolated)
 
     def test_repeated_edge_is_neutral_but_reverse_edge_is_a_return(self):
         engine = GhostChainsEngine()
@@ -205,26 +203,8 @@ class StructuralScoringTests(unittest.TestCase):
 
         self.assertLess(hub_extension, return_loop)
 
-    def test_bounded_return_loops_outrank_a_large_acyclic_hub(self):
-        hub = GhostChainsEngine()
-        for index in range(50):
-            hub.score_transaction(
-                transaction(
-                    f"wide-hub-{index}",
-                    f"payer-{index}",
-                    "merchant",
-                    when=BASE_TIME + timedelta(seconds=index),
-                )
-            )
-        hub_extension = hub.score_transaction(
-            transaction(
-                "wide-hub-out",
-                "merchant",
-                "supplier",
-                when=BASE_TIME + timedelta(minutes=1),
-            )
-        )
-
+    def test_return_signal_decays_coherently_with_route_length(self):
+        return_scores = []
         for cycle_length in range(2, 9):
             path = [
                 (f"N{index}", f"N{index + 1}")
@@ -234,8 +214,54 @@ class StructuralScoringTests(unittest.TestCase):
                 [*path, (f"N{cycle_length - 1}", "N0")],
                 prefix=f"cycle-{cycle_length}",
             )[-1]
+            return_scores.append(returning)
+
+        self.assertTrue(all(score > 0 for score in return_scores))
+        self.assertTrue(
+            all(
+                shorter > longer
+                for shorter, longer in zip(
+                    return_scores, return_scores[1:]
+                )
+            )
+        )
+
+    def test_every_bounded_return_outranks_acyclic_evidence(self):
+        convergence = score_edges(
+            [("A", "B"), ("A", "C"), ("B", "D"), ("C", "D")],
+            prefix="return-floor-convergence",
+        )[-1]
+        shortcut = score_edges(
+            [(f"P{index}", f"P{index + 1}") for index in range(7)]
+            + [("P0", "P7")],
+            prefix="return-floor-shortcut",
+        )[-1]
+        acyclic_ceiling = max(convergence, shortcut, 0.2)
+
+        for cycle_length in range(2, 9):
+            path = [
+                (f"N{index}", f"N{index + 1}")
+                for index in range(cycle_length - 1)
+            ]
+            returning = score_edges(
+                [*path, (f"N{cycle_length - 1}", "N0")],
+                prefix=f"return-floor-{cycle_length}",
+            )[-1]
             with self.subTest(cycle_length=cycle_length):
-                self.assertGreater(returning, hub_extension)
+                self.assertGreater(returning, acyclic_ceiling)
+
+    def test_overlapping_second_return_outranks_a_disjoint_first_return(self):
+        first_loop = [("A", "B"), ("B", "C"), ("C", "A")]
+        overlapping = score_edges(
+            [*first_loop, ("A", "D"), ("D", "E"), ("E", "A")],
+            prefix="overlapping-return",
+        )[-1]
+        disjoint = score_edges(
+            [*first_loop, ("X", "Y"), ("Y", "Z"), ("Z", "X")],
+            prefix="disjoint-return",
+        )[-1]
+
+        self.assertGreater(overlapping, disjoint)
 
     def test_novelty_and_reinforcement_share_one_acyclic_cap(self):
         branches = 5
@@ -325,7 +351,7 @@ class StructuralScoringTests(unittest.TestCase):
 
 
 class TemporalStateTests(unittest.TestCase):
-    def test_twenty_four_hour_window_is_inclusive_at_the_boundary(self):
+    def test_twenty_four_hour_window_expires_the_exact_boundary(self):
         inside = GhostChainsEngine()
         inside.score_transaction(transaction("inside-1", "A", "B"))
         inside_score = inside.score_transaction(
@@ -357,22 +383,154 @@ class TemporalStateTests(unittest.TestCase):
         )
 
         self.assertGreater(inside_score, 0.4)
-        self.assertGreater(boundary_score, 0.4)
+        self.assertEqual(boundary_score, 0.0)
         self.assertEqual(outside_score, 0.0)
 
     def test_timezone_offset_is_normalized_at_the_window_boundary(self):
-        engine = GhostChainsEngine()
+        inside = GhostChainsEngine()
         first = transaction("offset-1", "A", "B")
         first["createdAt"] = "2026-06-08T20:00:00+08:00"
-        engine.score_transaction(first)
-
-        boundary_score = engine.score_transaction(
+        inside.score_transaction(first)
+        inside_score = inside.score_transaction(
             transaction(
-                "offset-2", "B", "A", when=BASE_TIME + timedelta(hours=24)
+                "offset-2",
+                "B",
+                "A",
+                when=BASE_TIME + timedelta(hours=24, microseconds=-1),
             )
         )
 
-        self.assertGreater(boundary_score, 0.4)
+        boundary = GhostChainsEngine()
+        boundary.score_transaction(first | {"txId": "offset-boundary-1"})
+        boundary_score = boundary.score_transaction(
+            transaction(
+                "offset-boundary-2",
+                "B",
+                "A",
+                when=BASE_TIME + timedelta(hours=24),
+            )
+        )
+
+        self.assertGreater(inside_score, 0.4)
+        self.assertEqual(boundary_score, 0.0)
+
+    def test_causal_chain_outranks_reversed_event_time(self):
+        causal = GhostChainsEngine()
+        causal.score_transaction(
+            transaction("causal-1", "A", "B", when=BASE_TIME)
+        )
+        causal_score = causal.score_transaction(
+            transaction(
+                "causal-2", "B", "C", when=BASE_TIME + timedelta(minutes=1)
+            )
+        )
+
+        reversed_time = GhostChainsEngine()
+        reversed_time.score_transaction(
+            transaction(
+                "reversed-1", "A", "B", when=BASE_TIME + timedelta(minutes=1)
+            )
+        )
+        reversed_score = reversed_time.score_transaction(
+            transaction("reversed-2", "B", "C", when=BASE_TIME)
+        )
+
+        self.assertGreater(causal_score, reversed_score)
+        self.assertEqual(reversed_score, 0.0)
+
+    def test_causal_return_outranks_reversed_event_time(self):
+        causal = GhostChainsEngine()
+        causal_score = causal.score_batch(
+            [
+                transaction("cycle-causal-1", "A", "B", when=BASE_TIME),
+                transaction(
+                    "cycle-causal-2",
+                    "B",
+                    "C",
+                    when=BASE_TIME + timedelta(minutes=1),
+                ),
+                transaction(
+                    "cycle-causal-3",
+                    "C",
+                    "A",
+                    when=BASE_TIME + timedelta(minutes=2),
+                ),
+            ]
+        )[-1]
+
+        reversed_time = GhostChainsEngine()
+        reversed_score = reversed_time.score_batch(
+            [
+                transaction(
+                    "cycle-reversed-1",
+                    "A",
+                    "B",
+                    when=BASE_TIME + timedelta(minutes=2),
+                ),
+                transaction(
+                    "cycle-reversed-2",
+                    "B",
+                    "C",
+                    when=BASE_TIME + timedelta(minutes=1),
+                ),
+                transaction("cycle-reversed-3", "C", "A", when=BASE_TIME),
+            ]
+        )[-1]
+
+        self.assertGreater(causal_score, reversed_score)
+
+    def test_equal_timestamps_use_arrival_sequence(self):
+        causal = GhostChainsEngine()
+        causal.score_transaction(transaction("tie-1", "A", "B"))
+        causal_score = causal.score_transaction(transaction("tie-2", "B", "C"))
+
+        reversed_arrival = GhostChainsEngine()
+        reversed_arrival.score_transaction(transaction("tie-r1", "B", "C"))
+        reversed_score = reversed_arrival.score_transaction(
+            transaction("tie-r2", "A", "B")
+        )
+
+        self.assertGreater(causal_score, reversed_score)
+        self.assertEqual(reversed_score, 0.0)
+
+    def test_late_event_can_bridge_to_a_later_active_event(self):
+        engine = GhostChainsEngine()
+        engine.score_transaction(
+            transaction(
+                "later-edge", "B", "C", when=BASE_TIME + timedelta(minutes=2)
+            )
+        )
+
+        bridge_score = engine.score_transaction(
+            transaction(
+                "late-bridge", "A", "B", when=BASE_TIME + timedelta(minutes=1)
+            )
+        )
+
+        self.assertGreater(bridge_score, 0.0)
+
+    def test_repeated_edge_can_enable_a_new_causal_route(self):
+        engine = GhostChainsEngine()
+        engine.score_transaction(transaction("repeat-old", "A", "B"))
+        engine.score_transaction(
+            transaction(
+                "repeat-prefix",
+                "X",
+                "A",
+                when=BASE_TIME + timedelta(minutes=1),
+            )
+        )
+
+        enabling_repeat = engine.score_transaction(
+            transaction(
+                "repeat-new",
+                "A",
+                "B",
+                when=BASE_TIME + timedelta(minutes=2),
+            )
+        )
+
+        self.assertGreater(enabling_repeat, 0.0)
 
     def test_out_of_order_transaction_inside_window_is_inserted(self):
         engine = GhostChainsEngine()
@@ -456,7 +614,7 @@ class TemporalStateTests(unittest.TestCase):
         self.assertEqual(would_be_return, 0.0)
         self.assertNotIn(("A", "B", 1), engine.snapshot().active_edges)
 
-    def test_out_of_order_transaction_at_cutoff_is_inserted(self):
+    def test_out_of_order_transaction_at_cutoff_is_not_inserted(self):
         engine = GhostChainsEngine()
         engine.score_transaction(
             transaction("watermark", "X", "Y", when=BASE_TIME + timedelta(hours=24))
@@ -470,8 +628,8 @@ class TemporalStateTests(unittest.TestCase):
         )
 
         self.assertEqual(boundary, 0.0)
-        self.assertGreater(returning, 0.4)
-        self.assertIn(("A", "B", 1), engine.snapshot().active_edges)
+        self.assertEqual(returning, 0.0)
+        self.assertNotIn(("A", "B", 1), engine.snapshot().active_edges)
 
     def test_parallel_edge_reference_count_survives_first_expiry(self):
         engine = GhostChainsEngine()
@@ -700,7 +858,15 @@ class IdempotencyAndBatchTests(unittest.TestCase):
 class GhostChainsApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.phase_environment = patch.object(
+            main_module, "_GHOST_CHAINS_PHASE", "1"
+        )
+        cls.phase_environment.start()
         cls.client = TestClient(app)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.phase_environment.stop()
 
     def setUp(self):
         response = self.client.post(
@@ -713,6 +879,53 @@ class GhostChainsApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+
+    def test_runtime_reports_the_phase_one_temporal_model(self):
+        with patch.dict(
+            main_module.os.environ,
+            {"RENDER_GIT_COMMIT": "", "RENDER_INSTANCE_ID": ""},
+        ):
+            response = self.client.get("/ghost-chains/runtime")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(), {"phase": "1", "model": "temporal-routes-v1"}
+        )
+
+    def test_runtime_exposes_the_deployed_render_artifact(self):
+        with patch.dict(
+            main_module.os.environ,
+            {
+                "RENDER_GIT_COMMIT": "abc123",
+                "RENDER_INSTANCE_ID": "instance-1",
+            },
+        ):
+            response = self.client.get("/ghost-chains/runtime")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["revision"], "abc123")
+        self.assertEqual(response.json()["instance"], "instance-1")
+
+    def test_phase_one_endpoint_does_not_add_identity_evidence(self):
+        payloads = [
+            transaction("phase-one-id-1", "A", "B", deviceId="device-a"),
+            transaction(
+                "phase-one-id-2",
+                "B",
+                "C",
+                when=BASE_TIME + timedelta(minutes=1),
+                deviceId="device-a",
+            ),
+        ]
+        expected = GhostChainsEngine().score_batch(payloads)
+
+        response = self.client.post(
+            "/ghost-chains/transactions", json={"transactions": payloads}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        observed = [item["riskScore"] for item in response.json()["transactions"]]
+        self.assertEqual(observed, expected)
 
     def test_documented_unrelated_transactions_both_score_zero(self):
         payloads = [

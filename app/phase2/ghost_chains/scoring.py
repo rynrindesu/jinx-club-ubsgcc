@@ -5,6 +5,7 @@ from app.phase1.ghost_chains.scoring import (
     DiscountedWalkScorer,
     ScoreConfig,
     StructuralScore,
+    TemporalEdge,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "DiscountedWalkScorer",
     "ScoreConfig",
     "StructuralScore",
+    "TemporalEdge",
 ]

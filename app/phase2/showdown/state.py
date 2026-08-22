@@ -12,6 +12,7 @@ from .rules import (
     build_candidate_rules,
     extract_observations,
 )
+from .scouting import observations_for_leg
 
 
 @dataclass(frozen=True)
@@ -315,17 +316,19 @@ class AttemptState:
 class Phase2State:
     """Own the event, attempt, and leg state used by the live endpoint."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, use_scouted_priors: bool = True) -> None:
         self._lock = RLock()
         self._candidates = build_candidate_rules()
         self._rules: dict[str, RuleKnowledge] = {}
         self._attempt: AttemptState | None = None
+        self._use_scouted_priors = use_scouted_priors
 
     def observe_payload(
         self, payload: Mapping[str, object]
     ) -> tuple[RuleKnowledge, OpponentProfile]:
         table_rule = str(payload.get("table_rule", ""))
         match_id = str(payload.get("match_id", ""))
+        leg_number = _integer(payload.get("leg_number"))
         your_seat = payload.get("your_seat")
         recent_hands = payload.get("recent_hands")
         hands = (
@@ -338,6 +341,9 @@ class Phase2State:
             knowledge = self._rules.setdefault(
                 table_rule, RuleKnowledge(self._candidates)
             )
+            if self._use_scouted_priors and knowledge.observation_count == 0:
+                for observation in observations_for_leg(leg_number):
+                    knowledge.ingest(observation)
             for observation in extract_observations(
                 table_rule=table_rule,
                 match_id=match_id,
@@ -346,7 +352,6 @@ class Phase2State:
             ):
                 knowledge.ingest(observation)
 
-            leg_number = _integer(payload.get("leg_number"))
             opponent_token = _opponent_token(payload)
             if self._attempt is None or (
                 leg_number == 1

@@ -16,7 +16,7 @@ from .models import (
     TransactionConflictError,
     coerce_transaction,
 )
-from .scoring import DiscountedWalkScorer, ScoreConfig
+from .scoring import DiscountedWalkScorer, ScoreConfig, StructuralScore, TemporalEdge
 
 
 @dataclass(frozen=True)
@@ -219,20 +219,29 @@ class GhostChainsEngine:
             self._remember(transaction, score)
             return score
 
-        pair = (transaction.sender, transaction.recipient)
-        if self._pair_counts[pair] > 0:
-            score = 0.0
-        else:
-            score = self.scorer.score_new_edge(
-                transaction.sender,
-                transaction.recipient,
-                self._forward,
-                self._reverse,
-            ).risk
+        score = self._score_structural(transaction).risk
 
         self._remember(transaction, score)
         self._activate(transaction)
         return score
+
+    def _score_structural(self, transaction: Transaction) -> StructuralScore:
+        candidate = TemporalEdge(
+            sender=transaction.sender,
+            recipient=transaction.recipient,
+            created_at=transaction.created_at,
+            sequence=self._next_sequence + 1,
+        )
+        active_events = (
+            TemporalEdge(
+                sender=entry.transaction.sender,
+                recipient=entry.transaction.recipient,
+                created_at=entry.transaction.created_at,
+                sequence=entry.sequence,
+            )
+            for entry in self._active.values()
+        )
+        return self.scorer.score_new_event(candidate, active_events)
 
     def _remember(self, transaction: Transaction, score: float) -> None:
         self._ledger.add(transaction.tx_id, transaction.fingerprint, score)
@@ -257,7 +266,7 @@ class GhostChainsEngine:
         if self._watermark is None:
             return
         cutoff = self._watermark - self.window
-        while self._expiry_heap and self._expiry_heap[0][0] < cutoff:
+        while self._expiry_heap and self._expiry_heap[0][0] <= cutoff:
             _, sequence, tx_id = heapq.heappop(self._expiry_heap)
             active = self._active.get(tx_id)
             if active is None or active.sequence != sequence:
@@ -282,7 +291,7 @@ class GhostChainsEngine:
     def _is_outside_window(self, created_at: datetime) -> bool:
         if self._watermark is None:
             return False
-        return created_at < self._watermark - self.window
+        return created_at <= self._watermark - self.window
 
 
 _default_engine = GhostChainsEngine()

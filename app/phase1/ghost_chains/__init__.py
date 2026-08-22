@@ -1,7 +1,12 @@
 """Ghost Chains Phase 1 structural-risk engine."""
 
 from .models import Transaction, TransactionConflictError, TransactionValidationError
-from .scoring import DiscountedWalkScorer, ScoreConfig, StructuralScore
+from .scoring import (
+    DiscountedWalkScorer,
+    ScoreConfig,
+    StructuralScore,
+    TemporalEdge,
+)
 from .solution import (
     EngineSnapshot,
     GhostChainsEngine,
@@ -17,6 +22,7 @@ __all__ = [
     "GhostChainsEngine",
     "ScoreConfig",
     "StructuralScore",
+    "TemporalEdge",
     "Transaction",
     "TransactionConflictError",
     "TransactionValidationError",

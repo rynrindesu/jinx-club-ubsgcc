@@ -180,7 +180,7 @@ class RuleInferenceTests(unittest.TestCase):
             self.assertFalse(identical, candidate.name)
 
     def test_observation_ingestion_is_repeat_safe_and_skips_equal_numbers(self):
-        state = Phase2State()
+        state = Phase2State(use_scouted_priors=False)
         request = phase2_request()
         request["recent_hands"] = [completed_hand(1, 4, 9, 6, -1)]
 
@@ -260,7 +260,7 @@ class RuleInferenceTests(unittest.TestCase):
         self.assertAlmostEqual(estimate.lower, 0.5 / 13)
 
     def test_folded_hand_never_creates_showdown_rule_evidence(self):
-        state = Phase2State()
+        state = Phase2State(use_scouted_priors=False)
         request = phase2_request(table_rule="fold-rule")
         request["recent_hands"] = [
             completed_hand(
@@ -284,7 +284,7 @@ class RuleInferenceTests(unittest.TestCase):
         self.assertEqual(knowledge.observation_count, 0)
 
     def test_distinct_number_tie_is_recorded_as_rule_evidence(self):
-        state = Phase2State()
+        state = Phase2State(use_scouted_priors=False)
         request = phase2_request(table_rule="tie-rule")
         request["recent_hands"] = [completed_hand(1, 4, 9, 7, 0)]
 
@@ -312,10 +312,66 @@ class RuleInferenceTests(unittest.TestCase):
         self.assertEqual(knowledge.estimate(3, 5).confidence, "partial")
         self.assertEqual(knowledge.active_candidates, set())
 
+    def test_scouted_attempt_seeds_the_fixed_leg_rules_once(self):
+        state = Phase2State()
+        expected = {
+            1: (11, {"higher", "pair_then_higher"}),
+            2: (
+                9,
+                {"higher", "pair_then_higher", "pair_loses_then_higher"},
+            ),
+            3: (
+                14,
+                {"higher", "pair_then_higher", "pair_loses_then_higher"},
+            ),
+            4: (
+                7,
+                {
+                    "lower",
+                    "pair_then_lower",
+                    "pair_loses_then_lower",
+                    "fibonacci_first_lower",
+                },
+            ),
+        }
+
+        for leg_number, (count, candidate_names) in expected.items():
+            request = phase2_request(
+                table_rule=f"scouted-leg-{leg_number}",
+                match_id=f"retry-leg-{leg_number}",
+                leg_number=leg_number,
+            )
+            knowledge, _ = state.observe_payload(request)
+            state.observe_payload(copy.deepcopy(request))
+            active_names = {
+                knowledge.candidates[index].name
+                for index in knowledge.active_candidates
+            }
+
+            self.assertEqual(knowledge.observation_count, count)
+            self.assertEqual(active_names, candidate_names)
+
+    def test_scouted_rule_is_locally_trusted_but_pair_ambiguity_stays_partial(self):
+        state = Phase2State()
+        request = phase2_request(
+            10,
+            table_rule="scouted-local-rule",
+            leg_number=2,
+        )
+        knowledge, _ = state.observe_payload(request)
+
+        ordinary = knowledge.estimate(10, 5)
+        unresolved_pair = knowledge.estimate(5, 5)
+
+        self.assertEqual(ordinary.confidence, "learned")
+        self.assertLessEqual(ordinary.disagreement, 0.10)
+        self.assertEqual(unresolved_pair.confidence, "partial")
+        self.assertGreater(unresolved_pair.disagreement, 0.90)
+
 
 class Phase2PolicyTests(unittest.TestCase):
     def test_unknown_rule_limps_and_never_assumes_a_pair_is_strong(self):
-        engine = Phase2Engine()
+        engine = Phase2Engine(Phase2State(use_scouted_priors=False))
         self.assertEqual(engine.decide(phase2_request(13)), {"action": "call"})
 
         pair = post_bet_request(5, 5)
@@ -362,7 +418,8 @@ class Phase2PolicyTests(unittest.TestCase):
         request["players"][0].update(stack=188, bet_this_round=2)
         request["players"][1].update(bet_this_round=5)
 
-        self.assertEqual(Phase2Engine().decide(request), {"action": "call"})
+        engine = Phase2Engine(Phase2State(use_scouted_priors=False))
+        self.assertEqual(engine.decide(request), {"action": "call"})
 
     def test_unknown_rule_occasionally_probes_a_four_chip_raise(self):
         request = phase2_request(7, match_id="probe-16")
@@ -391,7 +448,8 @@ class Phase2PolicyTests(unittest.TestCase):
         request["players"][0].update(stack=198, bet_this_round=2)
         request["players"][1].update(bet_this_round=6)
 
-        self.assertEqual(Phase2Engine().decide(request), {"action": "call"})
+        engine = Phase2Engine(Phase2State(use_scouted_priors=False))
+        self.assertEqual(engine.decide(request), {"action": "call"})
 
     def test_learned_codenames_produce_different_moves_for_same_numbers(self):
         state = Phase2State()
@@ -418,6 +476,32 @@ class Phase2PolicyTests(unittest.TestCase):
         )
 
         self.assertEqual(move, {"action": "raise", "amount": 4})
+
+    def test_learned_strong_hand_calls_instead_of_repeating_three_bet_leak(self):
+        state = Phase2State()
+        teach_candidate(state, "three-bet-control-rule", "higher")
+        request = phase2_request(13, table_rule="three-bet-control-rule")
+        request.update(
+            button_seat=1,
+            your_stack=198,
+            pot=7,
+            to_call=3,
+            min_raise_to=8,
+            max_raise_to=198,
+            legal_actions=["fold", "call", "raise"],
+            current_hand_actions=[
+                {
+                    "round": "pre_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 5,
+                }
+            ],
+        )
+        request["players"][0].update(stack=198, bet_this_round=2)
+        request["players"][1].update(bet_this_round=5)
+
+        self.assertEqual(Phase2Engine(state).decide(request), {"action": "call"})
 
     def test_calling_station_receives_more_post_reveal_value_bets(self):
         state = Phase2State()
@@ -566,7 +650,7 @@ class Phase2PolicyTests(unittest.TestCase):
 
         self.assertEqual(Phase2Engine().decide(request), {"action": "fold"})
 
-    def test_partial_rule_caps_total_hand_exposure_at_eight_chips(self):
+    def test_unresolved_rule_caps_scouting_exposure_at_twelve_chips(self):
         state = Phase2State()
         knowledge = teach_partial_high_family(state, "partial-risk-rule")
         self.assertEqual(knowledge.estimate(13, None).confidence, "partial")
@@ -601,9 +685,15 @@ class Phase2PolicyTests(unittest.TestCase):
         )
         reraised["players"][0].update(stack=196, bet_this_round=4)
         reraised["players"][1].update(stack=190, bet_this_round=10)
-        self.assertEqual(engine.decide(reraised), {"action": "fold"})
+        self.assertEqual(engine.decide(reraised), {"action": "call"})
 
-    def test_partial_consensus_defends_limp_and_check_from_small_stabs(self):
+        beyond_cap = copy.deepcopy(reraised)
+        beyond_cap.update(pot=17, to_call=9)
+        beyond_cap["current_hand_actions"][-1]["amount"] = 13
+        beyond_cap["players"][1].update(stack=187, bet_this_round=13)
+        self.assertEqual(engine.decide(beyond_cap), {"action": "fold"})
+
+    def test_partial_rule_scouts_small_stabs_without_raising(self):
         state = Phase2State()
         knowledge = teach_partial_high_family(state, "partial-stab-rule")
         estimate = knowledge.estimate(13, 5)
@@ -653,7 +743,7 @@ class Phase2PolicyTests(unittest.TestCase):
         post["players"][0].update(stack=178, bet_this_round=0)
         post["players"][1].update(bet_this_round=3)
 
-        self.assertEqual(engine.decide(pre), {"action": "raise", "amount": 8})
+        self.assertEqual(engine.decide(pre), {"action": "call"})
         self.assertEqual(engine.decide(post), {"action": "call"})
 
     def test_large_post_reveal_raise_needs_top_tier_learned_equity(self):
@@ -761,7 +851,7 @@ class Phase2PolicyTests(unittest.TestCase):
         late["hand_number"] = 30
         self.assertEqual(engine.decide(late), {"action": "fold"})
 
-    def test_desperate_partial_consensus_uses_half_pot_not_three_quarters(self):
+    def test_desperate_partial_rule_checks_instead_of_building_a_pot(self):
         state = Phase2State()
         teach_partial_high_family(state, "partial-sizing-rule")
         engine = Phase2Engine(state)
@@ -793,11 +883,9 @@ class Phase2PolicyTests(unittest.TestCase):
         request["players"][0].update(stack=188, bet_this_round=0)
         request["players"][1].update(bet_this_round=0)
 
-        self.assertEqual(
-            engine.decide(request), {"action": "bet", "amount": 3}
-        )
+        self.assertEqual(engine.decide(request), {"action": "check"})
 
-    def test_partial_consensus_value_bet_stays_inside_eight_chip_cap(self):
+    def test_partial_rule_checks_when_post_reveal_action_is_free(self):
         state = Phase2State()
         teach_partial_high_family(state, "partial-value-cap-rule")
         engine = Phase2Engine(state)
@@ -834,9 +922,7 @@ class Phase2PolicyTests(unittest.TestCase):
         request["players"][0].update(stack=195, bet_this_round=0)
         request["players"][1].update(bet_this_round=0)
 
-        self.assertEqual(
-            engine.decide(request), {"action": "bet", "amount": 3}
-        )
+        self.assertEqual(engine.decide(request), {"action": "check"})
 
     def test_policy_matrix_always_emits_a_legal_well_shaped_action(self):
         engine = Phase2Engine()
@@ -877,7 +963,7 @@ class Phase2PolicyTests(unittest.TestCase):
 
 class StateScopeTests(unittest.TestCase):
     def test_rule_knowledge_survives_attempt_reset(self):
-        state = Phase2State()
+        state = Phase2State(use_scouted_priors=False)
         first = phase2_request(table_rule="persistent-rule")
         first["recent_hands"] = [completed_hand(1, 9, 3, 7, 1)]
         knowledge, _ = state.observe_payload(first)
@@ -1024,7 +1110,7 @@ class DispatcherTests(unittest.TestCase):
         request["phase"] = 1
         phase_one = dispatch_move(request)
 
-        self.assertEqual(phase_two, {"action": "call"})
+        self.assertEqual(phase_two, {"action": "raise", "amount": 4})
         self.assertEqual(phase_one, {"action": "raise", "amount": 4})
 
 

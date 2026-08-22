@@ -14,7 +14,7 @@ from app.phase1.ghost_chains.solution import (
 
 from .identity import IdentityScorer
 from .models import Transaction
-from .scoring import DiscountedWalkScorer, ScoreConfig, StructuralScore
+from .scoring import DiscountedWalkScorer, ScoreConfig
 
 
 class GhostChainsEngine(StructuralGhostChainsEngine):
@@ -41,16 +41,7 @@ class GhostChainsEngine(StructuralGhostChainsEngine):
             self._remember(transaction, score)
             return score
 
-        pair = (transaction.sender, transaction.recipient)
-        if self._pair_counts[pair] > 0:
-            structural = StructuralScore.zero()
-        else:
-            structural = self.scorer.score_new_edge(
-                transaction.sender,
-                transaction.recipient,
-                self._forward,
-                self._reverse,
-            )
+        structural = self._score_structural(transaction)
 
         identity = self.identity_scorer.score(
             transaction,

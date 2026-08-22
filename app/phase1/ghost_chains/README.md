@@ -6,24 +6,26 @@ This package implements the structural-risk engine behind the required
 
 ## Model
 
-The active 24-hour transaction history is a binary directed graph. For a new
-edge, the scorer measures its marginal increase in bounded discounted walks:
+The active 24-hour history is a directed transaction-event graph. For a new
+event, the scorer measures its marginal increase in bounded discounted routes:
 
 `K = A + alpha*A^2 + ... + alpha^(L-1)*A^L`
 
-Pair capacity rewards path multiplicity, shortest-path efficiency rewards
-genuine shortcuts, and diagonal entries (closed money routes) carry extra
-weight. A small saturated destination-reuse potential recognizes distinct
-senders converging on one entity without turning merchant or payroll fan-in
-into the main signal. The ordinary value of a single direct edge is subtracted,
-so a disconnected transfer scores zero. Scores then saturate into `[0, 1]`.
-All non-closed evidence shares one cap, preventing novelty and reinforcement
-from stacking until a large acyclic bridge outweighs a return loop. Phase 1
-deliberately ignores amount, IP, and device values.
+Routes must follow strictly increasing `(createdAt, arrival sequence)` keys.
+They use simple entity signatures, with one return to the starting entity
+allowed, so parallel payments and repeated laps cannot manufacture route
+multiplicity. Pair capacity rewards distinct causal paths, shortest-path
+efficiency rewards genuine shortcuts, and closed money routes carry extra
+weight while decaying coherently by reciprocal hop count. The ordinary value
+of a single direct edge is subtracted, so a
+disconnected transfer scores zero. All non-closed evidence shares one cap
+before scores saturate into `[0, 1]`, preventing a large acyclic bridge from
+outweighing a return loop. Phase 1 deliberately ignores amount, IP, and device
+values.
 
 The engine also provides:
 
-- a watermark-defined active window `[M - 24h, M]`;
+- a watermark-defined active window `(M - 24h, M]`;
 - out-of-order processing without watermark rollback;
 - reference-counted parallel graph edges;
 - exact retry scores and conflicting-ID detection;

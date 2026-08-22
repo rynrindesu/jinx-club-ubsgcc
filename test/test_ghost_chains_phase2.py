@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta, timezone
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+import app.main as main_module
 from app.main import app
 from app.phase1.ghost_chains import GhostChainsEngine as Phase1Engine
 from app.phase2.ghost_chains import GhostChainsEngine
@@ -246,7 +248,15 @@ class IdentityStateTests(unittest.TestCase):
 class GhostChainsPhase2ApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.phase_environment = patch.object(
+            main_module, "_GHOST_CHAINS_PHASE", "2"
+        )
+        cls.phase_environment.start()
         cls.client = TestClient(app)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.phase_environment.stop()
 
     def setUp(self):
         response = self.client.post(
@@ -268,6 +278,9 @@ class GhostChainsPhase2ApiTests(unittest.TestCase):
         scores = [item["riskScore"] for item in response.json()["transactions"]]
         self.assertEqual(scores[0], 0.0)
         self.assertGreater(scores[1], 0.0)
+
+        runtime = self.client.get("/ghost-chains/runtime")
+        self.assertEqual(runtime.json()["phase"], "2")
 
 
 if __name__ == "__main__":
