@@ -168,7 +168,7 @@ class StudySelectionTests(unittest.TestCase):
 
 
 class McpDiscoveryTests(unittest.TestCase):
-    def test_advertises_the_phase2_tools(self):
+    def test_exposes_only_phase3_toolbox_tools(self):
         initialize = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -196,5 +196,9 @@ class McpDiscoveryTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('"name":"retrieve"', response.text)
-        self.assertIn('"name":"next_route_node"', response.text)
+        self.assertNotIn('"name":"retrieve"', response.text)
+        self.assertNotIn('"name":"next_route_node"', response.text)
+        self.assertIn('"name":"find_open_venues"', response.text)
+        self.assertIn('"name":"find_meeting_time"', response.text)
+        self.assertIn('"name":"find_meeting_point"', response.text)
+        self.assertIn('"name":"plan_outing"', response.text)

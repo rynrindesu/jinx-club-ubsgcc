@@ -17,6 +17,7 @@ from .outings import best_outing_plan
 
 
 DEFAULT_CHALLENGE_URL = "https://tool-box-2591eaa24fa3.herokuapp.com"
+mcp = FastMCP("Tool-box Working Life")
 
 
 def register_tools(mcp: FastMCP) -> None:
@@ -222,3 +223,8 @@ def _fetch_location(person: str, day: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("location response must be an object")
     return payload
+
+
+# This is intentionally a dedicated server.  Earlier phases have their own
+# MCP implementations, but Phase 3 must not expose their unrelated tools.
+register_tools(mcp)
