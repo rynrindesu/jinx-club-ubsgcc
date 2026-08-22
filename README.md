@@ -24,8 +24,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 Register the Render service base URL with SHOWDOWN. The coordinator appends
 `/move` when requesting a decision.
 
-Ghost Chains defaults to the Phase 1 engine. Set `GHOST_CHAINS_PHASE=2` in the
-deployment environment before a Phase 2 evaluation. The read-only
+Ghost Chains now defaults to the cumulative Phase 3 engine. Set
+`GHOST_CHAINS_PHASE=1` or `GHOST_CHAINS_PHASE=2` only when evaluating an older
+phase. The read-only
 `GET /ghost-chains/runtime` endpoint reports the active phase and model so a
 deployment can be verified before triggering an evaluation. On Render it also
 reports the deployed Git revision and instance identifier.

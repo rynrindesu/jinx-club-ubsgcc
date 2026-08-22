@@ -18,6 +18,10 @@ from .phase2.ghost_chains import (
     reset as reset_phase_two_ghost_chains,
     score_batch as score_phase_two_ghost_chains_batch,
 )
+from .phase3.ghost_chains import (
+    reset as reset_phase_three_ghost_chains,
+    score_batch as score_phase_three_ghost_chains_batch,
+)
 from .showdown import decide_move
 from .phase1.toolbox.server import mcp
 from .phase2.toolbox.server import register_tools as register_phase2_toolbox_tools
@@ -50,9 +54,9 @@ class GhostChainsTransactionsRequest(BaseModel):
 
 
 def _configured_ghost_chains_phase() -> str:
-    phase = os.getenv("GHOST_CHAINS_PHASE", "1").strip()
-    if phase not in {"1", "2"}:
-        raise RuntimeError("GHOST_CHAINS_PHASE must be '1' or '2'")
+    phase = os.getenv("GHOST_CHAINS_PHASE", "3").strip()
+    if phase not in {"1", "2", "3"}:
+        raise RuntimeError("GHOST_CHAINS_PHASE must be '1', '2', or '3'")
     return phase
 
 
@@ -60,13 +64,17 @@ _GHOST_CHAINS_PHASE = _configured_ghost_chains_phase()
 
 
 def _reset_ghost_chains() -> None:
-    if _GHOST_CHAINS_PHASE == "2":
+    if _GHOST_CHAINS_PHASE == "3":
+        reset_phase_three_ghost_chains()
+    elif _GHOST_CHAINS_PHASE == "2":
         reset_phase_two_ghost_chains()
     else:
         reset_phase_one_ghost_chains()
 
 
 def _score_ghost_chains_batch(transactions: list[Transaction]) -> list[float]:
+    if _GHOST_CHAINS_PHASE == "3":
+        return score_phase_three_ghost_chains_batch(transactions)
     if _GHOST_CHAINS_PHASE == "2":
         return score_phase_two_ghost_chains_batch(transactions)
     return score_phase_one_ghost_chains_batch(transactions)
@@ -100,7 +108,11 @@ def ghost_chains_runtime_endpoint() -> dict[str, str]:
 
     runtime = {
         "phase": _GHOST_CHAINS_PHASE,
-        "model": "temporal-routes-v1",
+        "model": (
+            "segmented-value-flow-v1"
+            if _GHOST_CHAINS_PHASE == "3"
+            else "temporal-routes-v1"
+        ),
     }
     if revision := os.getenv("RENDER_GIT_COMMIT"):
         runtime["revision"] = revision
