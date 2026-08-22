@@ -42,7 +42,15 @@ class Phase2Engine:
         if community is not None and not 1 <= community <= 13:
             community = None
 
-        estimate = knowledge.estimate(your_number, community)
+        opponent_range = profile.range_for(
+            payload=payload,
+            rule_knowledge=knowledge,
+        )
+        estimate = knowledge.estimate(
+            your_number,
+            community,
+            opponent_range=opponent_range,
+        )
         risk = _risk_context(payload)
         if risk.secure_current_hand:
             candidate = _fallback(payload, "check" if "check" in legal else "fold")
@@ -93,7 +101,10 @@ def _pre_reveal_move(
         if is_button and not actions and "call" in _legal_actions(payload):
             return {"action": "call"}
         if (
-            _cheap_calibration_allowed(payload, to_call, big_blind)
+            (
+                _cheap_calibration_allowed(payload, to_call, big_blind)
+                or _unknown_medium_probe(payload, to_call, big_blind)
+            )
             and to_call < stack
             and not risk.protect
         ):
@@ -138,13 +149,13 @@ def _pre_reveal_move(
         conservative = estimate.mean - 0.20 * estimate.disagreement
 
     if is_button and not actions:
-        open_threshold = 0.50
-        if profile.tight_folder:
-            open_threshold -= 0.06
-        if profile.calling_station:
-            open_threshold += 0.04
+        open_threshold = 0.34 if estimate.confidence == "learned" else 0.50
+        if estimate.confidence == "learned" and profile.tight_folder:
+            open_threshold = 0.22
+        elif estimate.confidence == "learned" and profile.calling_station:
+            open_threshold = 0.42
         if risk.protect:
-            open_threshold += 0.09
+            open_threshold += 0.08
         if risk.desperate:
             open_threshold -= 0.04
 
@@ -153,7 +164,8 @@ def _pre_reveal_move(
             return _fixed_wager(payload, target, fallback="call")
         if (
             "call" in _legal_actions(payload)
-            and estimate.mean >= open_threshold - 0.12
+            and estimate.mean
+            >= (0.24 if estimate.confidence == "learned" else open_threshold - 0.12)
             and not risk.protect
         ):
             return {"action": "call"}
@@ -172,9 +184,9 @@ def _pre_reveal_move(
         reraise_floor if facing_reraise else 0.45,
     )
     if not _call_exposure_allowed(
+        payload=payload,
         to_call=to_call,
         stack=stack,
-        big_blind=big_blind,
         conservative=conservative,
         estimate=estimate,
         risk=risk,
@@ -236,7 +248,10 @@ def _post_reveal_move(
         # A three-chip continuation is still cheap enough to prevent an
         # opponent from auto-profiting every time we limp or check.
         if (
-            _cheap_calibration_allowed(payload, to_call, big_blind)
+            (
+                _cheap_calibration_allowed(payload, to_call, big_blind)
+                or _unknown_medium_probe(payload, to_call, big_blind)
+            )
             and to_call < stack
             and not risk.protect
         ):
@@ -263,39 +278,32 @@ def _post_reveal_move(
         conservative = estimate.lower
     else:
         conservative = estimate.mean - 0.15 * estimate.disagreement
-    adjustment = 0.0
+    call_adjustment = 0.0
     if profile.aggressive:
-        adjustment -= 0.035
+        call_adjustment -= 0.035
     if profile.passive:
-        adjustment += 0.04
+        call_adjustment += 0.04
     if risk.protect:
-        adjustment += 0.12
+        call_adjustment += 0.12
     if risk.desperate:
-        adjustment -= 0.04
+        call_adjustment -= 0.04
 
     if to_call > 0:
         pot_odds = to_call / max(1, pot + to_call)
         fresh_fraction = to_call / max(1, pot - to_call)
-        range_floor = 0.43
-        if fresh_fraction > 0.35:
-            range_floor = 0.64
-        if fresh_fraction > 0.55:
-            range_floor = 0.78
-        if fresh_fraction > 1.05:
-            range_floor = 0.88
-        if _we_wagered_this_round(payload) and fresh_fraction > 0.35:
-            range_floor = max(range_floor, 0.80)
-        if risk.protect and fresh_fraction > 0.35:
-            range_floor = max(range_floor, 0.86)
-        required = max(
-            pot_odds + 0.055 + adjustment,
-            range_floor + max(0.0, adjustment),
-        )
+        confidence_margin = 0.03
+        if estimate.confidence == "partial":
+            confidence_margin = 0.06 if decision_consensus else 0.08
+        required = pot_odds + confidence_margin + call_adjustment
+        if fresh_fraction > 1.0:
+            required = max(required, 0.72)
+        if _we_wagered_this_round(payload):
+            required = max(required, 0.78)
 
         if not _call_exposure_allowed(
+            payload=payload,
             to_call=to_call,
             stack=stack,
-            big_blind=big_blind,
             conservative=conservative,
             estimate=estimate,
             risk=risk,
@@ -305,7 +313,7 @@ def _post_reveal_move(
         if conservative >= required:
             if (
                 "raise" in _legal_actions(payload)
-                and conservative >= 0.90 + max(0.0, adjustment)
+                and conservative >= 0.89
                 and estimate.confidence == "learned"
                 and not risk.protect
             ):
@@ -332,9 +340,15 @@ def _post_reveal_move(
     if wager_action is None:
         return _fallback(payload, "check")
 
-    value_threshold = 0.61 + adjustment
+    value_threshold = 0.59
     if profile.calling_station:
-        value_threshold += 0.025
+        value_threshold -= 0.05
+    elif profile.passive:
+        value_threshold -= 0.02
+    if risk.protect:
+        value_threshold += 0.08
+    if risk.desperate:
+        value_threshold -= 0.04
     if conservative >= value_threshold:
         fraction = 0.65 if profile.calling_station else 0.50
         if estimate.confidence == "partial" and not decision_consensus:
@@ -398,11 +412,7 @@ def _risk_context(payload: Mapping[str, Any]) -> RiskContext:
     future_blinds = _future_forced_bets(payload, remaining - 1)
     coast_floor = delta - committed - future_blinds
     secure_current = coast_floor >= 25
-    protect = (
-        secure_current
-        or delta >= 30
-        or (remaining <= 12 and delta >= 25)
-    )
+    protect = secure_current or (remaining <= 12 and delta >= 25)
     desperate = (
         (remaining <= 6 and delta < 20)
         or (remaining <= 3 and delta < 24)
@@ -452,6 +462,18 @@ def _cheap_calibration_allowed(
     )
 
 
+def _unknown_medium_probe(
+    payload: Mapping[str, Any], to_call: int, big_blind: int
+) -> bool:
+    """Occasionally defeat a four-to-six-chip anti-calibration stab."""
+
+    return (
+        to_call <= 3 * big_blind
+        and _within_calibration_cap(payload, to_call, big_blind)
+        and _roll(payload, "unknown-rule-probe") < 0.12
+    )
+
+
 def _within_calibration_cap(
     payload: Mapping[str, Any], to_call: int, big_blind: int
 ) -> bool:
@@ -481,9 +503,9 @@ def _decision_consensus(estimate: EquityEstimate) -> bool:
 
 def _call_exposure_allowed(
     *,
+    payload: Mapping[str, Any],
     to_call: int,
     stack: int,
-    big_blind: int,
     conservative: float,
     estimate: EquityEstimate,
     risk: RiskContext,
@@ -497,8 +519,9 @@ def _call_exposure_allowed(
         return proven_nuts
     if to_call / max(1, stack) >= 0.35 and conservative < 0.90:
         return False
-    score_cushion = max(big_blind, risk.delta - 25)
-    if risk.delta >= 25 and to_call > score_cushion and not proven_nuts:
+    current_commitment = _current_hand_commitment(payload)
+    score_cushion = max(0, risk.delta - 25 - current_commitment)
+    if risk.protect and to_call > score_cushion and not proven_nuts:
         return False
     return True
 
