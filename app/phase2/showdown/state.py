@@ -34,6 +34,7 @@ class OpponentProfile:
     fold_to_open_rate: float
     reraise_rate: float
     post_fold_rate: float
+    post_reraise_rate: float
     bet_after_check_rate: float
     aggression_rate: float
     open_responses: int
@@ -63,6 +64,18 @@ class OpponentProfile:
     @property
     def passive(self) -> bool:
         return self.decisions >= 6 and self.aggression_rate < 0.28
+
+    @property
+    def punishes_opens(self) -> bool:
+        """Return whether one observed open already drew a re-raise."""
+
+        return self.open_responses >= 1 and self.reraise_rate > 0.30
+
+    @property
+    def punishes_post_bets(self) -> bool:
+        """Return whether a value bet has already drawn a re-raise."""
+
+        return self.post_responses >= 1 and self.post_reraise_rate > 0.29
 
     def range_for(
         self,
@@ -140,6 +153,7 @@ class AttemptState:
     open_reraises: int = 0
     post_responses: int = 0
     post_folds: int = 0
+    post_reraises: int = 0
     checked_to: int = 0
     bets_after_check: int = 0
     decisions: int = 0
@@ -219,6 +233,7 @@ class AttemptState:
             ) in {"fold", "call", "raise"}:
                 self.post_responses += 1
                 self.post_folds += response.get("action") == "fold"
+                self.post_reraises += response.get("action") == "raise"
             elif action.get("action") == "check" and response.get("action") in {
                 "check",
                 "bet",
@@ -297,6 +312,9 @@ class AttemptState:
             ),
             post_fold_rate=_smoothed_rate(
                 self.post_folds, self.post_responses, 0.35
+            ),
+            post_reraise_rate=_smoothed_rate(
+                self.post_reraises, self.post_responses, 0.15
             ),
             bet_after_check_rate=_smoothed_rate(
                 self.bets_after_check, self.checked_to, 0.45

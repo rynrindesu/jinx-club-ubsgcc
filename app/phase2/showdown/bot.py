@@ -116,21 +116,23 @@ def _pre_reveal_move(
             return _fallback(payload, "call")
         return _fallback(payload, "fold")
 
-    # Partial means this specific decision is not yet resolved.  Scout without
-    # building a pot: check for free, call only inside the strict hand cap, and
-    # never raise.  This prevents one observation from stalling all learning.
+    # Partial means this specific decision is not yet resolved.  Free reveals
+    # are always useful, but a mature partial model must not pay a re-raise
+    # merely because it fits under a fixed cap.  That created a deterministic
+    # limp/call/fold pipeline against the Phase 2 opponent.
     if estimate.confidence == "partial":
         if to_call == 0:
             return _fallback(payload, "check")
         if (
             not risk.protect
             and to_call < stack
-            and _partial_exposure_allowed(
+            and _partial_call_allowed(
                 payload=payload,
                 to_call=to_call,
                 pot=pot,
                 big_blind=big_blind,
                 estimate=estimate,
+                post_reveal=False,
             )
         ):
             return _fallback(payload, "call")
@@ -159,7 +161,17 @@ def _pre_reveal_move(
         if risk.desperate:
             open_threshold -= 0.04
 
-        if conservative >= open_threshold:
+        # Once this opponent has punished an open, only open hands that also
+        # clear the continuation threshold.  Against general aggression use a
+        # smaller commitment premium so medium hands limp instead of creating
+        # another raise-to-four/fold line.
+        commitment_threshold = open_threshold
+        if profile.punishes_opens:
+            commitment_threshold = max(commitment_threshold, 0.80)
+        elif profile.aggressive:
+            commitment_threshold = max(commitment_threshold, 0.62)
+
+        if conservative >= commitment_threshold:
             target = 5 if profile.calling_station else 4
             return _fixed_wager(payload, target, fallback="call")
         if (
@@ -233,12 +245,13 @@ def _post_reveal_move(
         if (
             not risk.protect
             and to_call < stack
-            and _partial_exposure_allowed(
+            and _partial_call_allowed(
                 payload=payload,
                 to_call=to_call,
                 pot=pot,
                 big_blind=big_blind,
                 estimate=estimate,
+                post_reveal=True,
             )
         ):
             return _fallback(payload, "call")
@@ -305,6 +318,13 @@ def _post_reveal_move(
         value_threshold += 0.08
     if risk.desperate:
         value_threshold -= 0.04
+    # A value bet is only coherent if the same hand can continue against the
+    # response this opponent has already shown.  Checking retains all equity
+    # and removes the repeated bet-five/fold-to-twenty-one loss.
+    if profile.punishes_post_bets:
+        value_threshold = max(value_threshold, 0.78)
+    elif profile.aggressive:
+        value_threshold = max(value_threshold, 0.68)
     if conservative >= value_threshold:
         fraction = 0.65 if profile.calling_station else 0.50
         if (
@@ -373,21 +393,39 @@ def _risk_context(payload: Mapping[str, Any]) -> RiskContext:
     )
 
 
-def _partial_exposure_allowed(
+def _partial_call_allowed(
     *,
     payload: Mapping[str, Any],
     to_call: int,
     pot: int,
     big_blind: int,
     estimate: EquityEstimate,
+    post_reveal: bool,
 ) -> bool:
-    """Allow bounded scouting without letting one stab stop all learning."""
+    """Buy partial-rule showdowns only when discovery or equity pays for it."""
 
-    del pot
+    discovery = estimate.observation_count < 8
     exposure_cap = _calibration_exposure_cap(payload, big_blind)
-    if estimate.observation_count < 8 or estimate.candidate_count > 3:
+    if discovery or post_reveal:
         exposure_cap = max(exposure_cap, 6 * big_blind)
-    return _current_hand_commitment(payload) + to_call <= exposure_cap
+    if _current_hand_commitment(payload) + to_call > exposure_cap:
+        return False
+
+    pot_odds = to_call / max(1, pot + to_call)
+    if discovery:
+        # Early evidence has genuine information value, but even then do not
+        # pay when every live rule says the hand is already drawing dead.
+        information_credit = 0.10 if post_reveal else 0.06
+        return estimate.upper + information_credit >= pot_odds
+
+    disagreement_penalty = 0.20 if post_reveal else 0.25
+    conservative = estimate.mean - disagreement_penalty * estimate.disagreement
+    if post_reveal:
+        return conservative >= pot_odds + 0.04
+
+    # A pre-reveal call can still face another betting decision, so require a
+    # real strength edge rather than paying only to observe the community.
+    return conservative >= max(0.58, pot_odds + 0.10)
 
 
 def _cheap_calibration_allowed(

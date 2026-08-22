@@ -160,6 +160,24 @@ def teach_partial_high_family(state, codename):
     return knowledge
 
 
+def teach_mature_fallback(state, codename):
+    """Create a well-sampled rule that is outside the candidate library."""
+
+    knowledge = state.knowledge(codename)
+    knowledge.active_candidates = set()
+    for hand_number, community in enumerate(range(3, 11), 1):
+        knowledge.ingest(
+            ShowdownObservation(
+                key=(f"fallback-{codename}", hand_number, "0", "1"),
+                community=community,
+                first_number=12,
+                second_number=2,
+                outcome=1,
+            )
+        )
+    return knowledge
+
+
 class RuleInferenceTests(unittest.TestCase):
     def test_explicitly_fake_odd_first_high_rule_is_not_a_candidate(self):
         candidates = build_candidate_rules()
@@ -477,6 +495,78 @@ class Phase2PolicyTests(unittest.TestCase):
 
         self.assertEqual(move, {"action": "raise", "amount": 4})
 
+    def test_one_observed_reraise_stops_marginal_raise_then_fold_opens(self):
+        state = Phase2State(use_scouted_priors=False)
+        teach_candidate(state, "reraise-pressure-rule", "higher")
+        punished_open = completed_hand(
+            1,
+            6,
+            10,
+            5,
+            -1,
+            actions=[
+                {
+                    "round": "pre_reveal",
+                    "seat": 0,
+                    "action": "raise",
+                    "amount": 4,
+                },
+                {
+                    "round": "pre_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 10,
+                },
+                {"round": "pre_reveal", "seat": 0, "action": "fold"},
+            ],
+        )
+        request = phase2_request(
+            6,
+            table_rule="reraise-pressure-rule",
+            hand_number=2,
+        )
+        request["recent_hands"] = [punished_open]
+        engine = Phase2Engine(state)
+
+        self.assertEqual(engine.decide(request), {"action": "call"})
+
+        strong = copy.deepcopy(request)
+        strong["your_number"] = 13
+        self.assertEqual(
+            engine.decide(strong), {"action": "raise", "amount": 4}
+        )
+
+    def test_aggressive_opponent_turns_medium_opens_into_limps(self):
+        state = Phase2State(use_scouted_priors=False)
+        teach_candidate(state, "aggressive-open-rule", "higher")
+        pressure_hands = [
+            completed_hand(
+                hand_number,
+                7,
+                8,
+                5,
+                -1,
+                actions=[
+                    {
+                        "round": "post_reveal",
+                        "seat": 1,
+                        "action": "bet",
+                        "amount": 5,
+                    },
+                    {"round": "post_reveal", "seat": 0, "action": "fold"},
+                ],
+            )
+            for hand_number in range(1, 7)
+        ]
+        request = phase2_request(
+            7,
+            table_rule="aggressive-open-rule",
+            hand_number=7,
+        )
+        request["recent_hands"] = pressure_hands
+
+        self.assertEqual(Phase2Engine(state).decide(request), {"action": "call"})
+
     def test_learned_strong_hand_calls_instead_of_repeating_three_bet_leak(self):
         state = Phase2State()
         teach_candidate(state, "three-bet-control-rule", "higher")
@@ -745,6 +835,162 @@ class Phase2PolicyTests(unittest.TestCase):
 
         self.assertEqual(engine.decide(pre), {"action": "call"})
         self.assertEqual(engine.decide(post), {"action": "call"})
+
+    def test_mature_partial_rule_folds_before_repeat_scouting_pipeline(self):
+        state = Phase2State(use_scouted_priors=False)
+        knowledge = teach_mature_fallback(state, "mature-partial-rule")
+        self.assertEqual(knowledge.estimate(7, None).confidence, "partial")
+        engine = Phase2Engine(state)
+        request = phase2_request(
+            7,
+            table_rule="mature-partial-rule",
+            hand_number=12,
+        )
+        request.update(
+            your_stack=198,
+            pot=7,
+            to_call=3,
+            min_raise_to=8,
+            max_raise_to=198,
+            legal_actions=["fold", "call", "raise"],
+            current_hand_actions=[
+                {
+                    "round": "pre_reveal",
+                    "seat": 0,
+                    "action": "call",
+                    "amount": 2,
+                },
+                {
+                    "round": "pre_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 5,
+                },
+            ],
+        )
+        request["players"][0].update(stack=198, bet_this_round=2)
+        request["players"][1].update(bet_this_round=5)
+
+        self.assertEqual(engine.decide(request), {"action": "fold"})
+
+    def test_mature_partial_rule_can_finish_supported_twelve_chip_showdown(self):
+        state = Phase2State(use_scouted_priors=False)
+        knowledge = teach_mature_fallback(state, "supported-partial-rule")
+        for opponent in range(1, 13):
+            knowledge.ingest(
+                ShowdownObservation(
+                    key=("supported", opponent, "0", "1"),
+                    community=5,
+                    first_number=13,
+                    second_number=opponent,
+                    outcome=1,
+                )
+            )
+        estimate = knowledge.estimate(13, 5)
+        self.assertEqual(estimate.confidence, "partial")
+        self.assertGreater(estimate.lower, 0.90)
+        engine = Phase2Engine(state)
+        request = phase2_request(
+            13,
+            table_rule="supported-partial-rule",
+            hand_number=13,
+        )
+        request.update(
+            round="post_reveal",
+            community_number=5,
+            your_stack=195,
+            pot=17,
+            to_call=7,
+            min_raise_to=19,
+            max_raise_to=195,
+            legal_actions=["fold", "call", "raise"],
+            current_hand_actions=[
+                {
+                    "round": "pre_reveal",
+                    "seat": 0,
+                    "action": "call",
+                    "amount": 2,
+                },
+                {
+                    "round": "pre_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 5,
+                },
+                {
+                    "round": "pre_reveal",
+                    "seat": 0,
+                    "action": "call",
+                    "amount": 5,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "bet",
+                    "amount": 7,
+                },
+            ],
+        )
+        request["players"][0].update(stack=195, bet_this_round=0)
+        request["players"][1].update(bet_this_round=7)
+
+        self.assertEqual(engine.decide(request), {"action": "call"})
+
+    def test_one_post_reraise_stops_medium_bet_then_fold_lines(self):
+        state = Phase2State(use_scouted_priors=False)
+        teach_candidate(state, "post-reraise-rule", "lower")
+        punished_bet = completed_hand(
+            1,
+            4,
+            8,
+            10,
+            -1,
+            actions=[
+                {
+                    "round": "post_reveal",
+                    "seat": 0,
+                    "action": "bet",
+                    "amount": 5,
+                },
+                {
+                    "round": "post_reveal",
+                    "seat": 1,
+                    "action": "raise",
+                    "amount": 21,
+                },
+                {"round": "post_reveal", "seat": 0, "action": "fold"},
+            ],
+        )
+        request = phase2_request(
+            4,
+            table_rule="post-reraise-rule",
+            hand_number=2,
+        )
+        request.update(
+            round="post_reveal",
+            community_number=10,
+            your_stack=198,
+            pot=10,
+            to_call=0,
+            min_raise_to=2,
+            max_raise_to=198,
+            legal_actions=["check", "bet"],
+            current_hand_actions=[
+                {"round": "post_reveal", "seat": 1, "action": "check"}
+            ],
+            recent_hands=[punished_bet],
+        )
+        request["players"][0].update(stack=198, bet_this_round=0)
+        request["players"][1].update(bet_this_round=0)
+        engine = Phase2Engine(state)
+
+        self.assertEqual(engine.decide(request), {"action": "check"})
+
+        strongest = copy.deepcopy(request)
+        strongest["your_number"] = 1
+        self.assertEqual(
+            engine.decide(strongest), {"action": "bet", "amount": 5}
+        )
 
     def test_large_post_reveal_raise_needs_top_tier_learned_equity(self):
         state = Phase2State()

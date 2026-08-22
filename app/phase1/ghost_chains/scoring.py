@@ -1,4 +1,4 @@
-"""Time-respecting structural scoring for Ghost Chains Phase 1."""
+"""Active-graph structural scoring for Ghost Chains Phase 1."""
 
 from __future__ import annotations
 
@@ -26,6 +26,8 @@ class ScoreConfig:
     risk_half_saturation: float = 8.0
     self_transfer_risk: float = 0.12
     max_route_signatures: int = 250_000
+    topology_weight: float = 0.82
+    temporal_weight: float = 0.18
 
     def __post_init__(self) -> None:
         if self.max_walk_length < 1:
@@ -46,6 +48,15 @@ class ScoreConfig:
                 raise ValueError(f"{name} must be positive")
         if not 0 <= self.self_transfer_risk < 1:
             raise ValueError("self_transfer_risk must be in [0, 1)")
+        if self.topology_weight < 0 or self.temporal_weight < 0:
+            raise ValueError("structural mixture weights must be non-negative")
+        if not math.isclose(
+            self.topology_weight + self.temporal_weight,
+            1.0,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("structural mixture weights must sum to one")
 
 
 @dataclass(frozen=True)
@@ -66,6 +77,8 @@ class StructuralScore:
     raw: float
     open_route_delta: float
     closed_route_delta: float
+    topology_raw: float = 0.0
+    temporal_raw: float = 0.0
 
     @classmethod
     def zero(cls) -> StructuralScore:
@@ -80,7 +93,13 @@ class _RouteState:
 
 
 class DiscountedWalkScorer:
-    """Score marginal capacity added by causal, bounded entity routes."""
+    """Score marginal recurring-flow capacity in the active directed graph.
+
+    Topology is primary: active edges form a graph regardless of the order in
+    which their transactions happened to arrive. A smaller time-respecting
+    component rewards evidence that is also realizable as an observed flow,
+    without allowing timestamp order to erase an otherwise real return path.
+    """
 
     def __init__(self, config: ScoreConfig | None = None):
         self.config = config or ScoreConfig()
@@ -90,7 +109,7 @@ class DiscountedWalkScorer:
         candidate: TemporalEdge,
         active_events: Iterable[TemporalEdge],
     ) -> StructuralScore:
-        """Score a candidate against active events ordered by event time."""
+        """Score a candidate against the active graph and observed flow order."""
 
         active = tuple(active_events)
         if candidate.sender == candidate.recipient:
@@ -105,9 +124,50 @@ class DiscountedWalkScorer:
         # Keeping unrelated components out also makes the safety cap local rather
         # than allowing a dense, disconnected graph to affect this score.
         relevant = self._relevant_events(candidate, active)
-        before = self._route_state(relevant)
-        after = self._route_state((*relevant, candidate))
-        candidate_pair = (candidate.sender, candidate.recipient)
+        topology_before = self._topology_route_state(relevant)
+        topology_after = self._topology_route_state((*relevant, candidate))
+        temporal_before = self._temporal_route_state(relevant)
+        temporal_after = self._temporal_route_state((*relevant, candidate))
+
+        topology = self._state_delta(candidate, topology_before, topology_after)
+        temporal = self._state_delta(candidate, temporal_before, temporal_after)
+        config = self.config
+        raw = math.fsum(
+            (
+                config.topology_weight * topology.raw,
+                config.temporal_weight * temporal.raw,
+            )
+        )
+        open_route_delta = math.fsum(
+            (
+                config.topology_weight * topology.open_route_delta,
+                config.temporal_weight * temporal.open_route_delta,
+            )
+        )
+        closed_route_delta = math.fsum(
+            (
+                config.topology_weight * topology.closed_route_delta,
+                config.temporal_weight * temporal.closed_route_delta,
+            )
+        )
+        return StructuralScore(
+            risk=self._risk(raw),
+            raw=raw,
+            open_route_delta=open_route_delta,
+            closed_route_delta=closed_route_delta,
+            topology_raw=topology.raw,
+            temporal_raw=temporal.raw,
+        )
+
+    def _state_delta(
+        self,
+        candidate: TemporalEdge,
+        before: _RouteState,
+        after: _RouteState,
+    ) -> StructuralScore:
+        """Return the bounded marginal between two route-state snapshots."""
+
+        candidate_pair = candidate.sender, candidate.recipient
         direct_was_active = candidate_pair in before.direct_pairs
 
         open_deltas: list[float] = []
@@ -204,7 +264,48 @@ class DiscountedWalkScorer:
             if event.sender in reachable or event.recipient in reachable
         )
 
-    def _route_state(self, events: Iterable[TemporalEdge]) -> _RouteState:
+    def _topology_route_state(
+        self,
+        events: Iterable[TemporalEdge],
+    ) -> _RouteState:
+        """Enumerate bounded simple routes in the binary active graph."""
+
+        adjacency: defaultdict[str, set[str]] = defaultdict(set)
+        nodes: set[str] = set()
+        for event in events:
+            if event.sender == event.recipient:
+                continue
+            adjacency[event.sender].add(event.recipient)
+            nodes.add(event.sender)
+            nodes.add(event.recipient)
+
+        signatures: set[tuple[str, ...]] = set()
+        closed_signatures: set[tuple[str, ...]] = set()
+        for source in sorted(nodes):
+            stack = [(source, (source,))]
+            while stack and (
+                len(signatures) + len(closed_signatures)
+                < self.config.max_route_signatures
+            ):
+                node, route = stack.pop()
+                if len(route) - 1 >= self.config.max_walk_length:
+                    continue
+                for recipient in sorted(adjacency.get(node, ()), reverse=True):
+                    if recipient == source and len(route) > 1:
+                        closed_signatures.add(
+                            self._canonical_cycle((*route, source))
+                        )
+                        continue
+                    if recipient in route:
+                        continue
+                    extended = (*route, recipient)
+                    signatures.add(extended)
+                    stack.append((recipient, extended))
+
+        signatures.update(closed_signatures)
+        return self._state_from_signatures(signatures)
+
+    def _temporal_route_state(self, events: Iterable[TemporalEdge]) -> _RouteState:
         """Enumerate distinct simple entity routes in strict temporal order."""
 
         signatures: set[tuple[str, ...]] = set()
@@ -241,6 +342,12 @@ class DiscountedWalkScorer:
                 signatures.add(route)
                 routes_ending_at[route[-1]].add(route)
 
+        return self._state_from_signatures(signatures)
+
+    def _state_from_signatures(
+        self,
+        signatures: Iterable[tuple[str, ...]],
+    ) -> _RouteState:
         route_weights: defaultdict[tuple[str, str], list[float]] = defaultdict(list)
         shortest_distances: dict[tuple[str, str], int] = {}
         direct_pairs: set[tuple[str, str]] = set()
@@ -267,6 +374,15 @@ class DiscountedWalkScorer:
             shortest_distances=shortest_distances,
             direct_pairs=frozenset(direct_pairs),
         )
+
+    @staticmethod
+    def _canonical_cycle(route: tuple[str, ...]) -> tuple[str, ...]:
+        """Deduplicate rotations of one directed simple cycle."""
+
+        body = route[:-1]
+        rotations = tuple(body[index:] + body[:index] for index in range(len(body)))
+        canonical = min(rotations)
+        return (*canonical, canonical[0])
 
     def _pair_value(self, connectivity: float) -> float:
         """Reward a second distinct route more, then approach linear growth."""
