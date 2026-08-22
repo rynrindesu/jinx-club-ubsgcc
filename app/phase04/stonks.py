@@ -312,9 +312,9 @@ def _apply_transition(state: _State, transition: _Transition) -> _State:
     if state.year != transition.buy_year:
         actions.append(f"j-{state.year}-{transition.buy_year}")
     for opportunity, quantity in transition.purchases:
-        # A quote is a single-use lot: making any purchase permanently removes
-        # that (year, stock) opportunity, including shares we could not afford.
-        remaining[opportunity.listing_index] = 0
+        # Purchased shares are permanently removed from this historical
+        # year-stock inventory; any unpurchased shares remain for a revisit.
+        remaining[opportunity.listing_index] -= quantity
         actions.append(f"b-{opportunity.stock}-{quantity}")
 
     actions.append(f"j-{transition.buy_year}-{transition.sell_year}")
@@ -979,6 +979,13 @@ def solve_case(case: dict[str, Any]) -> list[str]:
 
     candidates = [_solve_case_primary(case)]
     _, capital, listings, _ = _parse_case(case)
+
+    # High energy can be better spent on several complete buy/sell cycles
+    # than on one broad V-shaped sweep.  Keep this independent planner in the
+    # ensemble so its liquid-state reinvestment routes compete by final cash.
+    from .stonks_cycles import solve_case as solve_cycle_case
+
+    candidates.append(solve_cycle_case(case))
 
     # The independent one-sweep bounded-knapsack planner is occasionally
     # stronger when reserving the initial capital across many outbound lots.
