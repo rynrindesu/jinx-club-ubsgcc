@@ -134,15 +134,16 @@ def _run_strategy(
     cash = capital
     year = PRESENT_YEAR
     energy_used = 0
-    used: set[int] = set()
+    remaining = [lot.qty for lot in lots]
     actions: list[str] = []
 
-    for _ in range(min(_MAX_TRADES, len(lots))):
+    for _ in range(_MAX_TRADES):
         best: tuple[tuple[float, ...], int, _Sale, int, int] | None = None
         for lot_index, lot in enumerate(lots):
-            if lot_index in used or lot.price > cash:
+            available = remaining[lot_index]
+            if available <= 0 or lot.price > cash:
                 continue
-            quantity = min(lot.qty, cash // lot.price)
+            quantity = min(available, cash // lot.price)
             if quantity <= 0:
                 continue
             for sale in lot.sales:
@@ -175,9 +176,7 @@ def _run_strategy(
         cash += quantity * (sale.price - lot.price)
         energy_used += travel
         year = sale.year
-        # Under the conservative reading of the challenge, touching a quoted
-        # year-stock lot consumes it even if cash only bought part of its qty.
-        used.add(lot_index)
+        remaining[lot_index] -= quantity
 
     if year != PRESENT_YEAR:
         actions.append(f"j-{year}-{PRESENT_YEAR}")

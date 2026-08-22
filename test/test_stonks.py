@@ -36,7 +36,7 @@ class StonksTests(unittest.TestCase):
 
         self.assertEqual(solve_case(case)[-1], "s-A-10")
 
-    def test_buying_once_consumes_the_entire_year_stock_lot(self):
+    def test_revisit_can_buy_only_the_historical_quantity_remaining(self):
         case = {
             "energy": 6,
             "capital": 10,
@@ -49,7 +49,9 @@ class StonksTests(unittest.TestCase):
         actions = solve_case(case)
 
         buys = [action for action in actions if action.startswith("b-A-")]
-        self.assertEqual(buys, ["b-A-1"])
+        self.assertGreater(len(buys), 1)
+        self.assertEqual(sum(int(action.rsplit("-", 1)[1]) for action in buys), 4)
+        self.assertEqual(_score_actions(case, actions), 50)
 
     def test_no_profitable_trade_returns_empty_actions(self):
         case = {

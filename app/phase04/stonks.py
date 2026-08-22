@@ -465,6 +465,7 @@ def _candidate_routes(
     promising = _promising_turn_years(reachable, listings, prices)
     trip_years = list(dict.fromkeys(promising[:10] + sampled))
     routes: list[list[int]] = [_sweep_route(year, prices) for year in sampled]
+    two_trip_routes: list[list[int]] = []
 
     # A shallow first trip can multiply the starting cash before a deeper trip
     # consumes a large, otherwise only-partly-affordable lot.  Order matters.
@@ -474,7 +475,9 @@ def _candidate_routes(
         for second_year in trip_years[:10]:
             second = _sweep_route(second_year, prices)
             if first_cost + _route_cost(second) <= energy:
-                routes.append(_compact_route([*first, *second[1:]]))
+                two_trip_routes.append(
+                    _compact_route([*first, *second[1:]])
+                )
 
     # Isolated pair tours avoid being distracted by marginal listings on the
     # way to an especially strong non-home sale.  Score with affordable gain.
@@ -502,7 +505,30 @@ def _candidate_routes(
                 )
             )
     pair_routes.sort(key=lambda item: (item[0], item[1]), reverse=True)
+
+    # When energy is plentiful, repeating a strong complete tour lets each
+    # sale finance a larger basket on the next visit.  Try both short repeats
+    # and the maximum affordable repeat count; historical inventory prevents
+    # these routes from buying more shares than actually existed.
+    repeated_routes: list[list[int]] = []
+    for _, _, route in pair_routes[:24]:
+        base_cost = _route_cost(route)
+        repetitions = min(25, energy // base_cost)
+        for count in dict.fromkeys((2, 3, repetitions)):
+            if count > repetitions:
+                continue
+            repeated = [PRESENT_YEAR]
+            for _ in range(count):
+                repeated.extend(route[1:])
+            repeated_routes.append(_compact_route(repeated))
+
+    # Preserve route diversity before applying the global cap: broad two-trip
+    # tours, reinvestment cycles, and isolated pair tours each catch different
+    # capital constraints.
+    routes.extend(two_trip_routes[:24])
+    routes.extend(repeated_routes[:32])
     routes.extend(route for _, _, route in pair_routes[:24])
+    routes.extend(two_trip_routes[24:])
 
     max_routes = 45 if len(listings) > 250 else 90 if len(listings) > 80 else 140
     unique: list[list[int]] = []

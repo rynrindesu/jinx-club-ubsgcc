@@ -34,7 +34,7 @@ class _Lot:
     qty: int
 
 
-_State = tuple[int, int, int, tuple[int, ...]]
+_State = tuple[int, int, tuple[int, ...], tuple[int, ...]]
 
 
 def _normalize_case(
@@ -165,7 +165,7 @@ def solve_case(case: dict[str, Any]) -> list[str] | None:
     start: _State = (
         PRESENT_YEAR,
         0,
-        (1 << len(lots)) - 1,
+        tuple(lot.qty for lot in lots),
         (0,) * len(stock_names),
     )
 
@@ -207,7 +207,7 @@ def solve_case(case: dict[str, Any]) -> list[str] | None:
         if expanded > _MAX_EXPANDED_STATES:
             return None
 
-        year, energy_used, unused_mask, holdings = state
+        year, energy_used, remaining, holdings = state
         if (
             year == PRESENT_YEAR
             and not any(holdings)
@@ -234,7 +234,7 @@ def solve_case(case: dict[str, Any]) -> list[str] | None:
                     (
                         year,
                         energy_used,
-                        unused_mask,
+                        remaining,
                         tuple(next_holdings),
                     ),
                     cash + qty * sell_price,
@@ -243,21 +243,24 @@ def solve_case(case: dict[str, Any]) -> list[str] | None:
                 ):
                     return None
 
-        # Any positive purchase consumes the entire (year, stock) lot, even
-        # when current cash only permits buying part of its quoted quantity.
+        # A purchase permanently removes those shares from the historical
+        # inventory; a later revisit may buy only the quantity left behind.
         for lot_index in lots_at_year.get(year, ()):
-            if not (unused_mask & (1 << lot_index)):
+            available = remaining[lot_index]
+            if available <= 0:
                 continue
             lot = lots[lot_index]
-            max_quantity = min(lot.qty, cash // lot.price)
+            max_quantity = min(available, cash // lot.price)
             for qty in range(1, max_quantity + 1):
                 next_holdings = list(holdings)
                 next_holdings[lot.stock_index] += qty
+                next_remaining = list(remaining)
+                next_remaining[lot_index] -= qty
                 if not push(
                     (
                         year,
                         energy_used,
-                        unused_mask & ~(1 << lot_index),
+                        tuple(next_remaining),
                         tuple(next_holdings),
                     ),
                     cash - qty * lot.price,
@@ -274,7 +277,7 @@ def solve_case(case: dict[str, Any]) -> list[str] | None:
             if next_energy + abs(PRESENT_YEAR - target_year) > energy:
                 continue
             if not push(
-                (target_year, next_energy, unused_mask, holdings),
+                (target_year, next_energy, remaining, holdings),
                 cash,
                 node_id,
                 f"j-{year}-{target_year}",
