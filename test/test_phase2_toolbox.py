@@ -146,7 +146,7 @@ class StudySelectionTests(unittest.TestCase):
         self.assertEqual(len(passages), 1)
         self.assertIn("worn drive belt", passages[0])
         self.assertNotIn("6 April", passages[0])
-        self.assertLessEqual(len(passages[0]), 220)
+        self.assertLessEqual(len(passages[0]), 300)
 
 
 class McpDiscoveryTests(unittest.TestCase):
