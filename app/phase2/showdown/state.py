@@ -241,15 +241,6 @@ class AttemptState:
         if opponent_number is None or not 1 <= opponent_number <= 13:
             return
 
-        estimate = rule_knowledge.estimate(opponent_number, community)
-        reliability = max(
-            0.20,
-            min(
-                1.0,
-                estimate.coverage * (1.0 - estimate.disagreement)
-                + (0.20 if estimate.confidence == "learned" else 0.0),
-            ),
-        )
         position = _position(
             opponent_seat,
             hand.get("button_seat"),
@@ -263,13 +254,26 @@ class AttemptState:
                 or action_name not in {"check", "call", "bet", "raise"}
             ):
                 continue
+            round_name = str(action.get("round", ""))
+            estimate = rule_knowledge.estimate(
+                opponent_number,
+                community if round_name == "post_reveal" else None,
+            )
+            reliability = max(
+                0.20,
+                min(
+                    1.0,
+                    estimate.coverage * (1.0 - estimate.disagreement)
+                    + (0.20 if estimate.confidence == "learned" else 0.0),
+                ),
+            )
             self.range_samples.append(
                 RangeEvidence(
                     strength=estimate.mean,
                     action=action_name,
                     size_bucket=_size_bucket(action, pot),
                     position=position,
-                    round_name=str(action.get("round", "")),
+                    round_name=round_name,
                     reliability=reliability,
                 )
             )
