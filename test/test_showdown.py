@@ -98,6 +98,48 @@ class DecisionTests(unittest.TestCase):
 
         self.assertEqual(decide_move(request), {"action": "call"})
 
+    def test_high_non_pair_calls_instead_of_value_raising_post_reveal(self):
+        request = sample_request()
+        request.update(
+            your_number=13,
+            community_number=11,
+            pot=45,
+            to_call=25,
+            min_raise_to=50,
+            max_raise_to=185,
+        )
+
+        self.assertEqual(decide_move(request), {"action": "call"})
+
+    def test_final_hand_non_pair_folds_to_all_in_reraise(self):
+        request = sample_request()
+        request.update(
+            match_id="phase1-final-hand",
+            hand_number=45,
+            total_hands=45,
+            your_number=13,
+            community_number=11,
+            your_stack=131,
+            pot=269,
+            to_call=131,
+            min_raise_to=None,
+            max_raise_to=None,
+            legal_actions=["fold", "call"],
+            current_hand_actions=[
+                {"round": "pre_reveal", "seat": 0, "action": "call", "amount": 2},
+                {"round": "pre_reveal", "seat": 1, "action": "raise", "amount": 5},
+                {"round": "pre_reveal", "seat": 0, "action": "raise", "amount": 10},
+                {"round": "pre_reveal", "seat": 1, "action": "call", "amount": 10},
+                {"round": "post_reveal", "seat": 1, "action": "bet", "amount": 25},
+                {"round": "post_reveal", "seat": 0, "action": "raise", "amount": 54},
+                {"round": "post_reveal", "seat": 1, "action": "raise", "amount": 195},
+            ],
+        )
+        request["players"][0].update(bet_this_round=54, stack=131)
+        request["players"][1].update(bet_this_round=195, stack=0, all_in=True)
+
+        self.assertEqual(decide_move(request), {"action": "fold"})
+
     def test_free_weak_hand_checks(self):
         request = sample_request()
         request.update(

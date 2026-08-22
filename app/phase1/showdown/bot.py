@@ -129,8 +129,35 @@ def _facing_bet(
             return {"action": "call"}
         return {"action": "raise"}
 
+    post_reveal = payload.get("round") == "post_reveal"
+    call_fraction = to_call / stack
+
+    # A post-reveal re-raise is much stronger evidence than an ordinary bet.
+    # Raw equity assumes every opponent number is equally likely, but after we
+    # raise and the opponent raises again their range is heavily concentrated
+    # on the community number (a pair).  Never risk a substantial part of the
+    # stack with a non-pair in that line.  Only a proven extreme aggressor gets
+    # called when the additional price is very small.
+    if (
+        post_reveal
+        and _facing_reraise(payload)
+        and "fold" in legal
+        and (call_fraction > 0.15 or profile.aggression < 0.68)
+    ):
+        return {"action": "fold"}
+
+    # The match score has a hard -200 bust outcome.  An unknown opponent's
+    # large post-reveal shove is not a spot to stack off with a non-pair, even
+    # when a high number has excellent unconditional showdown equity.
+    if post_reveal and call_fraction >= 0.45 and "fold" in legal:
+        return {"action": "fold"}
+
     has_calling_edge = equity >= call_threshold
-    value_raise = equity >= 0.76 and equity >= call_threshold + 0.10
+    value_raise = (
+        not post_reveal
+        and equity >= 0.76
+        and equity >= call_threshold + 0.10
+    )
     if (
         value_raise
         and "raise" in legal
@@ -324,6 +351,32 @@ def _opponent_pressure_count(payload: Mapping[str, Any]) -> int:
         and action.get("round") == current_round
         and action.get("seat") != your_seat
         and action.get("action") in {"bet", "raise"}
+    )
+
+
+def _facing_reraise(payload: Mapping[str, Any]) -> bool:
+    """Whether the opponent just raised after our bet or raise this round."""
+
+    your_seat = payload.get("your_seat")
+    current_round = payload.get("round")
+    actions = payload.get("current_hand_actions")
+    if not isinstance(actions, list):
+        return False
+
+    round_actions = [
+        action
+        for action in actions
+        if isinstance(action, Mapping) and action.get("round") == current_round
+    ]
+    if len(round_actions) < 2:
+        return False
+
+    previous, latest = round_actions[-2:]
+    return (
+        previous.get("seat") == your_seat
+        and previous.get("action") in {"bet", "raise"}
+        and latest.get("seat") != your_seat
+        and latest.get("action") == "raise"
     )
 
 
